@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScriptScout — Mock CP2</title>
+<style>
+  :root {
+    --ink: #1a1d23;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #f7f7f8;
+    --accent: #2563eb;
+    --accent-soft: #eff4ff;
+    --ok: #059669;
+    --warn: #b45309;
+    --warn-bg: #fffbeb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--line);
+    background: #fff;
+  }
+  header h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  .mock-banner {
+    background: var(--warn-bg);
+    color: var(--warn);
+    border: 1px solid #fde68a;
+    padding: 8px 24px;
+    font-size: 12.5px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; margin-top: 12px; }
+  label:first-child { margin-top: 0; }
+  input, select {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+  button.primary {
+    margin-top: 18px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.primary:disabled { background: #93b4f0; cursor: default; }
+  button.primary:hover:not(:disabled) { background: #1d4ed8; }
+
+  .export-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 4px; }
+  button.secondary {
+    background: #fff; color: var(--accent); border: 1px solid #c7d9fb;
+    padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  button.secondary:hover { background: var(--accent-soft); }
+
+  #loading { display: none; padding: 16px 0; color: var(--muted); font-size: 14px; }
+  #loading.show { display: block; }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: -2px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #results { display: none; }
+  #results.show { display: block; }
+
+  .source-group-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin: 14px 0 6px; }
+  .source-group-title:first-of-type { margin-top: 0; }
+  .sources-list { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .source-chip {
+    background: var(--accent-soft); border: 1px solid #c7d9fb;
+    border-radius: 6px; padding: 8px 10px; font-size: 12.5px; flex: 1; min-width: 220px;
+    cursor: pointer;
+  }
+  .source-chip:hover { border-color: var(--accent); }
+  .source-chip b { display: block; font-size: 12px; color: var(--accent); margin-bottom: 2px; }
+  .source-chip span { color: var(--muted); word-break: break-word; }
+  .conf-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 6px;
+    border-radius: 10px; margin-left: 6px; vertical-align: 1px;
+  }
+  .conf-cao { background: #d1fae5; color: var(--ok); }
+  .conf-trung-binh { background: #fef3c7; color: var(--warn); }
+  .conf-thap { background: #fee2e2; color: #b91c1c; }
+  .proof-meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; font-size: 12.5px; margin-bottom: 10px; }
+  .proof-meta dt { color: var(--muted); }
+  .proof-meta dd { margin: 0; }
+  .mini-chart { display: flex; align-items: flex-end; gap: 4px; height: 60px; margin: 8px 0; }
+  .mini-chart div { background: var(--accent); border-radius: 2px 2px 0 0; flex: 1; }
+  .mini-chart-labels { display: flex; gap: 4px; font-size: 10px; color: var(--muted); margin-bottom: 10px; }
+  .mini-chart-labels span { flex: 1; text-align: center; }
+
+  .sentence {
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    font-size: 14.5px;
+    line-height: 1.5;
+    transition: border-color .15s, background .15s;
+  }
+  .sentence:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .sentence.active { border-color: var(--accent); background: var(--accent-soft); }
+  .sentence.no-src { cursor: default; color: var(--muted); font-style: italic; }
+  .sentence.no-src:hover { border-color: var(--line); background: none; }
+  .sentence-meta { margin-top: 6px; font-size: 11.5px; color: var(--muted); font-style: normal; }
+  .cite {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: 2px;
+  }
+
+  #proof { display: none; }
+  #proof.show { display: block; }
+  #proof .proof-head { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  #proof .proof-body {
+    background: #fafafa; border: 1px dashed #cbd5e1; border-radius: 8px;
+    padding: 14px; font-size: 13.5px; line-height: 1.6;
+  }
+  #proof mark { background: #fef08a; padding: 0 2px; }
+  .empty-hint { color: var(--muted); font-size: 13.5px; padding: 10px 0; }
+
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ScriptScout</h1>
+  <p>Chọn slide bài giảng có sẵn → nhận kịch bản video, mỗi câu gắn đúng trang slide — bấm vào câu để xem đúng nội dung chứng minh.</p>
+</header>
+<div class="mock-banner">
+  ⚠️ Bản Mock CP2 — nội dung slide, nguồn bổ sung và câu kịch bản là dữ liệu giả lập cố định (dựng từ 1 slide thật + tư liệu công khai có thật, rút gọn). Lời gọi AI thật (đọc slide + tự tìm nguồn bổ sung + sinh kịch bản) sẽ có ở CP3.
+</div>
+
+<main>
+  <div class="card">
+    <label for="slide">Slide bài giảng đầu vào</label>
+    <select id="slide">
+      <option>D1 — AI &amp; LLM Foundation (6 trang)</option>
+    </select>
+
+    <div class="row">
+      <div>
+        <label for="goal">Mục tiêu bài học</label>
+        <input id="goal" placeholder="VD: Học viên phân biệt được AI, ML, DL, GenAI, LLM" value="Học viên phân biệt được AI, ML, Deep Learning, GenAI, LLM và ba nhóm AI chính">
+      </div>
+      <div>
+        <label for="audience">Đối tượng học</label>
+        <select id="audience">
+          <option>Học viên mới bắt đầu</option>
+          <option>Học viên đã có nền tảng lập trình</option>
+          <option>Giảng viên / Studio team</option>
+        </select>
+      </div>
+    </div>
+
+    <label for="duration">Thời lượng (phút)</label>
+    <input id="duration" type="number" value="3" min="1" max="60">
+
+    <button class="primary" id="runBtn">Đọc slide, tìm thêm nguồn &amp; viết kịch bản</button>
+
+    <div id="loading"><span class="spinner"></span>Đang đọc slide, tìm thêm nguồn bổ sung (paper, biểu đồ, ví dụ thực tế) và viết kịch bản…</div>
+  </div>
+
+  <div class="card" id="results">
+    <h3 style="margin-top:0;">Hồ sơ tài liệu</h3>
+    <div id="sourcesArea"></div>
+
+    <h3>Kịch bản</h3>
+    <div id="sentenceList"></div>
+    <p class="empty-hint" id="clickHint">👆 Bấm vào một câu hoặc một nguồn bất kỳ để xem đúng chỗ chứng minh cho nó.</p>
+
+    <div class="export-row">
+      <button class="secondary" id="exportScriptBtn">⬇️ Xuất kịch bản (.json) — để dựng video</button>
+      <button class="secondary" id="exportSourcesBtn">⬇️ Xuất hồ sơ tài liệu (.json)</button>
+    </div>
+
+    <div id="proof">
+      <div class="proof-head">Đoạn chứng minh — <span id="proofSourceName"></span></div>
+      <dl class="proof-meta" id="proofMeta"></dl>
+      <div class="proof-body" id="proofBody"></div>
+    </div>
+  </div>
+</main>
+
+<footer>ScriptScout · Track C · Đề C3 · Nhóm ScoutX · Prototype mức Mock (CP2)</footer>
+
+<script>
+// ---- Mock data ----
+// Nguồn slide: rút gọn từ data/vlearn-pack/slides/d1-slide-hackathon.pdf (trang 3,4,5) — tài liệu thật của khoá.
+// Nguồn bổ sung (paper/nguồn bên ngoài/biểu đồ/ví dụ): thông tin công khai có thật, đơn giản hoá cho mock.
+// Chưa gọi AI thật (để CP3) — toàn bộ cố định cho luồng demo CP2.
+const MOCK = {
+  sources: [
+    { id: "s3", type: "slide", icon: "🎞️", title: "Trang 3 — AI, ML, Deep Learning, GenAI, LLM: nằm ở đâu trong cùng một hệ?",
+      to: "Slide D1 · AI & LLM Foundation (khoá học)", ngay: "tài liệu nội bộ khoá", doTinCay: "cao",
+      ly: "Tài liệu giảng dạy chính thức của khoá, do giảng viên biên soạn cho đúng buổi học này.",
+      excerpt: "<b>AI</b> — chiếc ô lớn nhất: mọi hệ thống có yếu tố &ldquo;thông minh&rdquo;.<br><b>Machine learning</b> — <mark>học từ dữ liệu thay vì viết luật tay</mark>.<br><b>Deep learning</b> — mạng nơ-ron nhiều tầng tự học đặc trưng.<br><b>Generative AI</b> — sinh nội dung mới: văn bản, ảnh, code.<br><b>LLM</b> — model nền chuyên ngôn ngữ, tim của làn sóng hiện nay." },
+    { id: "s4", type: "slide", icon: "🎞️", title: "Trang 4 — Ba nhóm AI chính: phân loại · sinh nội dung · hành động",
+      to: "Slide D1 · AI & LLM Foundation (khoá học)", ngay: "tài liệu nội bộ khoá", doTinCay: "cao",
+      ly: "Tài liệu giảng dạy chính thức của khoá, do giảng viên biên soạn cho đúng buổi học này.",
+      excerpt: "<b>Discriminative AI</b> — giỏi phân loại, dự đoán: lọc spam, phát hiện gian lận, nhận diện ảnh. <i>Input → một nhãn, một con số.</i><br><b>Generative AI</b> — sinh ra thứ mới: văn bản, ảnh, code. ChatGPT, Claude, Midjourney. <i>Prompt → nội dung mới.</i><br><b>Agentic AI</b> — nhận <mark>mục tiêu rồi tự làm nhiều bước</mark>: lập kế hoạch, dùng công cụ, hành động. <i>Goal → Plan → Action.</i>" },
+    { id: "s5", type: "slide", icon: "🎞️", title: "Trang 5 — Lịch sử AI 70 năm",
+      to: "Slide D1 · AI & LLM Foundation (khoá học)", ngay: "tài liệu nội bộ khoá", doTinCay: "cao",
+      ly: "Tài liệu giảng dạy chính thức của khoá; mốc thời gian dùng để minh hoạ, không phải số liệu đo lường định lượng.",
+      excerpt: "Dòng thời gian: Dartmouth Workshop 1956 → Perceptrons 1969 → mùa đông AI lần 1 (1974-80) → Hệ chuyên gia 1980 → mùa đông lần 2 → Deep Learning 2006 → AlexNet 2012 → <mark>Transformer 2017</mark> → GPT-1/BERT 2018 → <mark>ChatGPT 2022</mark> → Kỷ nguyên Agent 2024." },
+    { id: "paper1", type: "paper", icon: "📄", title: "Attention Is All You Need",
+      to: "Vaswani et al., Google Brain / Google Research", ngay: "12/06/2017", doTinCay: "cao",
+      ly: "Bài báo gốc giới thiệu kiến trúc Transformer, được trích dẫn hơn một trăm nghìn lần, vẫn là nền tảng của LLM hiện nay.",
+      url: "arxiv.org/abs/1706.03762",
+      excerpt: "Đề xuất kiến trúc Transformer: bỏ hoàn toàn recurrence và convolution, chỉ dùng cơ chế <mark>attention</mark> để mô hình hoá quan hệ giữa các từ trong câu — nền tảng kỹ thuật cho các LLM xuất hiện sau đó." },
+    { id: "ext1", type: "external", icon: "📰", title: "Introducing ChatGPT",
+      to: "OpenAI — thông báo chính thức", ngay: "30/11/2022", doTinCay: "cao",
+      ly: "Thông báo chính thức từ chính đơn vị phát hành sản phẩm, có ngày công bố rõ ràng, kiểm chứng được.",
+      url: "openai.com/blog/chatgpt",
+      excerpt: "OpenAI ra mắt ChatGPT — giao diện hội thoại giúp hàng triệu người lần đầu dùng trực tiếp một mô hình ngôn ngữ lớn mà không cần biết lập trình." },
+    { id: "chart1", type: "bieu-do", icon: "📊", title: "Biểu đồ: các mốc kiến trúc/mô hình AI nổi bật theo năm",
+      to: "Dựng lại từ dòng thời gian ở Trang 5 (slide D1)", ngay: "tài liệu nội bộ khoá", doTinCay: "cao",
+      ly: "Cùng nguồn với slide trang 5 — vẽ lại dạng biểu đồ cột để người xem thấy tốc độ dày lên rõ hơn là đọc chữ.",
+      chart: [
+        { label: "1956\nDartmouth", h: 10 },
+        { label: "1980\nHệ CG", h: 18 },
+        { label: "2012\nAlexNet", h: 38 },
+        { label: "2017\nTransformer", h: 55 },
+        { label: "2022\nChatGPT", h: 85 },
+        { label: "2024\nAgent", h: 100 }
+      ],
+      excerpt: "Khoảng cách giữa các mốc ngày càng ngắn lại — từ vài chục năm (1956→1980) rút xuống còn vài năm (2017→2022→2024), cho thấy tốc độ ứng dụng đang tăng nhanh, không đều theo thời gian." },
+    { id: "vidu1", type: "vi-du", icon: "💡", title: "Ví dụ thực tế: bộ lọc thư rác Gmail",
+      to: "Quan sát phổ biến — không phải số liệu đo được", ngay: "—", doTinCay: "trung-binh",
+      ly: "Ví dụ minh hoạ quen thuộc với hầu hết người học, giúp cụ thể hoá khái niệm; không dùng để khẳng định con số nào.",
+      excerpt: "Khi Gmail tự động chuyển một email vào mục Spam trước khi người dùng kịp mở, đó chính là <mark>Discriminative AI</mark> đang phân loại thư dựa trên đặc điểm học được từ rất nhiều email trước đó — đúng ví dụ &ldquo;lọc spam&rdquo; nói ở trang 4." }
+  ],
+  sentences: [
+    { n: 1, phan: 1, kieu: "kể", text: "Bạn hỏi AI một câu, nó trả lời ngay — nhưng bên trong đó thật ra là năm lớp công nghệ xếp chồng lên nhau.",
+      manHinh: "AI · ML · DL · GenAI · LLM", yDoHinh: "Năm vòng tròn đồng tâm mờ dần hiện lên lần lượt, từ ngoài vào trong.", src: null },
+    { n: 2, phan: 1, kieu: "giảng", text: "Trí tuệ nhân tạo là chiếc ô lớn nhất, gồm mọi hệ thống có yếu tố được gọi là thông minh.",
+      manHinh: "AI — chiếc ô lớn nhất", yDoHinh: "Vòng tròn ngoài cùng sáng lên, nhãn AI hiện rõ.", src: "s3" },
+    { n: 3, phan: 1, kieu: "giảng", text: "Bên trong AI, học máy là cách hệ thống học từ dữ liệu thay vì được lập trình viết sẵn từng luật.",
+      manHinh: "Machine Learning — học từ dữ liệu", yDoHinh: "Vòng tròn thứ hai sáng lên bên trong vòng AI; nhiều chấm dữ liệu bay vào giữa.", src: "s3" },
+    { n: 4, phan: 2, kieu: "giảng", text: "Càng đi sâu vào trong, deep learning là mạng nơ-ron nhiều tầng tự học ra đặc trưng, không cần con người chỉ tay.",
+      manHinh: "Deep Learning — tự học đặc trưng", yDoHinh: "Sơ đồ mạng nơ-ron nhiều lớp hiện dần từ trái sang phải bên trong vòng tròn thứ ba.", src: "s3" },
+    { n: 5, phan: 2, kieu: "giảng", text: "Trong lòng deep learning, generative AI là nhóm sinh ra nội dung hoàn toàn mới như văn bản, ảnh hay code.",
+      manHinh: "Generative AI — sinh nội dung mới", yDoHinh: "Vòng tròn trong cùng bật sáng, ba biểu tượng văn bản/ảnh/code bay ra từ tâm.", src: "s3" },
+    { n: 6, phan: 3, kieu: "kể", text: "Nhìn theo cách khác, AI chia làm ba nhóm việc: nhóm phân loại dự đoán, nhóm sinh nội dung, và nhóm tự hành động.",
+      manHinh: "Phân loại · Sinh nội dung · Hành động", yDoHinh: "Ba thẻ đặt cạnh nhau: Discriminative, Generative, Agentic — thẻ giữa (Generative) viền sáng.", src: "s4" },
+    { n: 7, phan: 3, kieu: "chốt", text: "Agentic AI khác hai nhóm kia ở chỗ nó nhận một mục tiêu, rồi tự lập kế hoạch và tự làm nhiều bước để đạt mục tiêu đó.",
+      manHinh: "Goal → Plan → Action", yDoHinh: "Mũi tên nối ba ô Goal, Plan, Action chạy nối tiếp nhau.", src: "s4" },
+    { n: 8, phan: 4, kieu: "kể", text: "Ý tưởng làm máy biết suy nghĩ đã có từ bảy mươi năm trước, nhưng đến vài năm gần đây mới thực sự bùng nổ.",
+      manHinh: "70 năm lịch sử AI", yDoHinh: "Đường cong thời gian trải dài từ 1956 đến hiện tại, camera lướt từ trái sang phải.", src: "s5" },
+    { n: 9, phan: 4, kieu: "giảng", text: "Bước ngoặt kỹ thuật đến vào năm hai nghìn không trăm mười bảy, khi một nhóm nghiên cứu công bố kiến trúc Transformer — nền móng của hầu hết mô hình ngôn ngữ lớn ngày nay.",
+      manHinh: "2017 · Transformer ra đời", yDoHinh: "Mốc 2017 trên đường thời gian nhấp sáng, bìa bài báo mờ hiện phía sau.", src: "paper1" },
+    { n: 10, phan: 4, kieu: "kể", text: "Năm năm sau, ChatGPT ra mắt và lần đầu tiên đưa một mô hình ngôn ngữ lớn đến thẳng tay hàng triệu người dùng phổ thông.",
+      manHinh: "2022 · ChatGPT ra mắt", yDoHinh: "Mốc 2022 nhấp sáng; khung chat đơn giản hiện lên với một câu hỏi gõ vào.", src: "ext1" },
+    { n: 11, phan: 4, kieu: "giảng", text: "Nhìn trên biểu đồ, khoảng cách giữa các mốc công nghệ ngày càng ngắn lại — điều từng mất hàng chục năm giờ chỉ còn tính bằng năm.",
+      manHinh: "Khoảng cách các mốc rút ngắn dần", yDoHinh: "Biểu đồ cột các mốc hiện dần từ trái sang phải, cột sau cao và sát cột trước hơn.", src: "chart1" },
+    { n: 12, phan: 5, kieu: "kể", text: "Một ví dụ rất gần: mỗi lần Gmail tự chuyển một email vào mục thư rác, đó chính là một hệ thống AI đang âm thầm phân loại giúp bạn.",
+      manHinh: "Gmail tự lọc thư rác", yDoHinh: "Một phong bì thư bay vào, rẽ nhánh vào hộp \"Spam\" thay vì \"Hộp thư đến\".", src: "vidu1" },
+    { n: 13, phan: 5, kieu: "chốt", text: "Năm lớp công nghệ, ba nhóm việc, và một dòng lịch sử ngày càng dồn dập — đó là bức tranh AI mà buổi học hôm nay muốn bạn mang về.",
+      manHinh: "Tổng kết", yDoHinh: "Ba hình đã dùng (vòng tròn đồng tâm, ba thẻ nhóm, đường thời gian) thu nhỏ và xếp cạnh nhau.", src: null }
+  ]
+};
+
+const PHAN_TITLES = {
+  1: "Mở đầu — năm lớp công nghệ",
+  2: "Đi sâu vào bên trong AI",
+  3: "Ba nhóm việc chính",
+  4: "Vì sao đúng lúc này",
+  5: "Ví dụ gần bạn và tổng kết"
+};
+const KIEU_CODE = { "kể": "ke", "giảng": "giang", "thân mật": "nhe", "hỏi": "hoi", "chốt": "nhan" };
+
+function stripHtml(html) {
+  return html
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/?(b|i|mark)>/gi, '')
+    .replace(/&ldquo;|&rdquo;/g, '"')
+    .trim();
+}
+
+function downloadJSON(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildScriptExport() {
+  const phanNums = [...new Set(MOCK.sentences.map(s => s.phan))];
+  return {
+    schema: "hackathon-kich-ban/1",
+    id: "scriptscout-mock-d1",
+    tieuDe: "AI, ML, Deep Learning, GenAI, LLM và ba nhóm AI chính",
+    mucTieu: document.getElementById('goal').value,
+    doiTuong: document.getElementById('audience').value,
+    thoiLuongPhutDuKien: Number(document.getElementById('duration').value),
+    phan: phanNums.map(so => ({ so, ten: PHAN_TITLES[so] || `Phần ${so}` })),
+    cau: MOCK.sentences.map(s => ({
+      n: s.n,
+      phan: s.phan,
+      kieu: KIEU_CODE[s.kieu] || "giang",
+      loi: s.text,
+      chuTrenManHinh: s.manHinh,
+      yDoHinh: s.yDoHinh,
+      ...(s.src ? { nguon: ["t-" + s.src] } : {})
+    }))
+  };
+}
+
+function buildSourcesExport() {
+  return {
+    schema: "hackathon-ho-so-nguon/1",
+    chuDe: "AI, ML, Deep Learning, GenAI, LLM và ba nhóm AI chính",
+    ngayChay: new Date().toISOString(),
+    nguon: MOCK.sources.map(s => ({
+      id: s.id,
+      url: s.url || null,
+      tieuDe: s.title,
+      toChuc: s.to,
+      ngayDang: s.ngay,
+      loai: s.type,
+      doTinCay: s.doTinCay,
+      lyDoTinCay: s.ly
+    })),
+    thongTin: MOCK.sources.map(s => ({
+      id: "t-" + s.id,
+      noiDung: stripHtml(s.excerpt),
+      loai: s.type,
+      bangChung: [{
+        nguonId: s.id,
+        doanTrich: stripHtml(s.excerpt),
+        viTri: s.type === 'slide' ? ('Trang ' + s.id.slice(1)) : (s.ngay || '—')
+      }],
+      soNguonXacNhan: 1,
+      trangThai: "da-xac-minh"
+    }))
+  };
+}
+
+const runBtn = document.getElementById('runBtn');
+const loading = document.getElementById('loading');
+const results = document.getElementById('results');
+const sourcesArea = document.getElementById('sourcesArea');
+const sentenceList = document.getElementById('sentenceList');
+const proof = document.getElementById('proof');
+const proofBody = document.getElementById('proofBody');
+const proofMeta = document.getElementById('proofMeta');
+const proofSourceName = document.getElementById('proofSourceName');
+const clickHint = document.getElementById('clickHint');
+const exportScriptBtn = document.getElementById('exportScriptBtn');
+const exportSourcesBtn = document.getElementById('exportSourcesBtn');
+
+exportScriptBtn.addEventListener('click', () => downloadJSON(buildScriptExport(), 'scriptscout-kich-ban.json'));
+exportSourcesBtn.addEventListener('click', () => downloadJSON(buildSourcesExport(), 'scriptscout-ho-so-nguon.json'));
+
+const GROUP_LABEL = {
+  slide: "Từ slide bài giảng (nguồn chính)",
+  paper: "Paper / nghiên cứu",
+  external: "Nguồn bên ngoài",
+  "bieu-do": "Biểu đồ",
+  "vi-du": "Ví dụ dẫn chứng"
+};
+const GROUP_ORDER = ["slide", "paper", "external", "bieu-do", "vi-du"];
+
+function confClass(doTinCay) { return "conf-" + doTinCay.replace(/\s+/g, "-"); }
+
+function renderSources() {
+  const byType = {};
+  MOCK.sources.forEach(s => { (byType[s.type] = byType[s.type] || []).push(s); });
+
+  sourcesArea.innerHTML = GROUP_ORDER.filter(t => byType[t]).map(t => `
+    <div class="source-group-title">${GROUP_LABEL[t]}</div>
+    <div class="sources-list">
+      ${byType[t].map(s => `
+        <div class="source-chip" data-src="${s.id}">
+          <b>${s.icon} ${s.title}<span class="conf-badge ${confClass(s.doTinCay)}">${s.doTinCay}</span></b>
+          <span>${s.to}${s.ngay && s.ngay !== "—" ? " · " + s.ngay : ""}</span>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.source-chip').forEach(el => {
+    el.addEventListener('click', () => showProofBySource(el.dataset.src));
+  });
+}
+
+function renderSentences() {
+  sentenceList.innerHTML = MOCK.sentences.map((s, i) => {
+    const source = s.src ? MOCK.sources.find(x => x.id === s.src) : null;
+    const cite = source ? `<span class="cite">${source.icon} ${source.type === 'slide' ? 'Trang ' + source.id.slice(1) : source.title}</span>` : '';
+    const clickable = s.src ? 'sentence' : 'sentence no-src';
+    return `<div class="${clickable}" data-idx="${i}">
+      <div>${s.text}${cite}</div>
+      <div class="sentence-meta">Kiểu: ${s.kieu} · Trên màn hình: "${s.manHinh}"</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.sentence').forEach(el => {
+    el.addEventListener('click', () => {
+      const s = MOCK.sentences[parseInt(el.dataset.idx)];
+      if (!s.src) return;
+      document.querySelectorAll('.sentence').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+      showProofBySource(s.src);
+    });
+  });
+}
+
+function showProofBySource(srcId) {
+  const source = MOCK.sources.find(x => x.id === srcId);
+  proofSourceName.textContent = `${source.icon} ${source.title}`;
+
+  proofMeta.innerHTML = `
+    <dt>Loại</dt><dd>${GROUP_LABEL[source.type]}</dd>
+    <dt>Tác giả / tổ chức</dt><dd>${source.to}</dd>
+    <dt>Ngày</dt><dd>${source.ngay}</dd>
+    <dt>Độ tin cậy</dt><dd><span class="conf-badge ${confClass(source.doTinCay)}">${source.doTinCay}</span> — ${source.ly}</dd>
+    ${source.url ? `<dt>Nguồn</dt><dd>${source.url}</dd>` : ''}
+  `;
+
+  let body = `<div>${source.excerpt}</div>`;
+  if (source.chart) {
+    const bars = source.chart.map(c => `<div style="height:${c.h}%"></div>`).join('');
+    const labels = source.chart.map(c => `<span>${c.label.replace('\n', '<br>')}</span>`).join('');
+    body = `<div class="mini-chart">${bars}</div><div class="mini-chart-labels">${labels}</div>` + body;
+  }
+  proofBody.innerHTML = body;
+
+  proof.classList.add('show');
+  clickHint.style.display = 'none';
+}
+
+runBtn.addEventListener('click', () => {
+  results.classList.remove('show');
+  proof.classList.remove('show');
+  clickHint.style.display = 'block';
+  loading.classList.add('show');
+  runBtn.disabled = true;
+
+  // giả lập độ trễ gọi AI thật — CP3 sẽ thay bằng lời gọi thật
+  setTimeout(() => {
+    loading.classList.remove('show');
+    runBtn.disabled = false;
+    renderSources();
+    renderSentences();
+    results.classList.add('show');
+  }, 1400);
+});
+</script>
+
+</body>
+</html>
