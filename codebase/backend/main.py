@@ -24,6 +24,14 @@ client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 app = FastAPI()
 
 MAX_PAGES = 40  # đã test: slide thật(xem PLAN.md mục 6a)
+
+
+def estimate_target_sentences(duration_minutes: int) -> int:
+    """Theo mau-kich-ban.md: ~2,9 âm tiết/giây, 1 câu ~20 âm tiết ≈ 7 giây/câu. Phát hiện thật: kịch
+    bản 4-5 câu không thể nào đủ 4 phút — prompt trước đó không hề tính số câu cần theo thời lượng."""
+    return max(4, round(duration_minutes * 60 / 7))
+
+
 MAX_MB = 15  # TBD — tương tự
 
 
@@ -321,6 +329,7 @@ async def generate(
 
     prompt_text = PROMPT_TEMPLATE.format(
         topic=topic, goal=goal, audience=audience, duration=duration,
+        target_sentences=estimate_target_sentences(duration),
         slide_text=source_text or "(người dùng không upload slide — dùng nguồn mạng làm nguồn chính)",
         web_text=web_text or "(không tìm được nguồn ngoài, chỉ dùng slide)",
     )
@@ -381,6 +390,7 @@ async def add_source(
 
     prompt_text = PROMPT_TEMPLATE.format(
         topic=topic, goal=goal, audience=audience, duration=duration,
+        target_sentences=estimate_target_sentences(duration),
         slide_text=source_text or "(người dùng không upload slide — dùng nguồn mạng làm nguồn chính)",
         web_text=web_text_combined,
     ) + (
