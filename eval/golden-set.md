@@ -175,3 +175,13 @@ gây fail giả (không phải AI bịa, mà do so với dữ liệu nền đã 
 thể đều fail vì lỗi này. Hướng sửa đúng (chưa làm, cần thời gian): chỉ validate phần MỚI (`thongTinMoi`/
 `cauVietLai`) bằng Layer 4a/Layer 7, bỏ qua phần `thongTin` cũ giữ nguyên vì đã qua validate ở lượt sinh
 trước rồi.
+
+## Case 26 — lần thứ 3 làm kịch bản dài hơn: THÀNH CÔNG (tách 2 lượt AI riêng biệt)
+
+Sau 2 lần thất bại (case 24, 25b) vì nhồi chung "kéo dài" và "trích dẫn đúng" vào 1 prompt, tách hẳn thành
+endpoint riêng `/expand-script`: lượt AI thứ 2 CHỈ chèn thêm câu minh hoạ (`nguon: []`, không chữ số,
+không sự kiện mới) xen giữa kịch bản đã validate xong ở lượt 1, có guard tự rớt về bản gốc nếu AI vi phạm.
+
+Test 2/2 lần: 7→12 câu và 7→13 câu, toàn bộ câu mới đúng chuẩn (không trích dẫn, không chữ số), toàn bộ
+câu gốc giữ nguyên. Bài học: tách trách nhiệm ra 2 lượt AI độc lập ổn định hơn nhiều so với dồn hết yêu
+cầu vào 1 prompt dài — đúng như dự đoán ở case 24.
