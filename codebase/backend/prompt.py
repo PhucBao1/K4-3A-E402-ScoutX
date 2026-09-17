@@ -47,9 +47,22 @@ markdown code fence.
 Khối "hoSo" — schema "hackathon-ho-so-nguon/1": liệt kê MỌI nguồn đã dùng (cả từ slide lẫn từ mạng) trong
 mảng "nguon", mỗi nguồn có: id (chuỗi ngắn tự đặt, duy nhất), tieuDe, toChuc (ghi "Slide bài giảng khoá
 học" nếu từ slide, hoặc tên tác giả/tổ chức thật nếu từ mạng), ngayDang, url (chỉ có nếu là nguồn mạng, để
-trống/null nếu là slide), loai ("slide" hoặc "web"), doTinCay ("cao"/"trung-binh"/"thap"), lyDoTinCay (với
-nguồn mạng: đánh giá dựa trên tác giả có rõ ràng không, có ngày công bố không, có được nguồn khác xác nhận
-không — không chỉ vì "tìm thấy trên mạng" là tự động tin được).
+trống/null nếu là slide), doTinCay ("cao"/"trung-binh"/"thap"), lyDoTinCay (với nguồn mạng: đánh giá dựa
+trên tác giả có rõ ràng không, có ngày công bố không, có được nguồn khác xác nhận không — không chỉ vì
+"tìm thấy trên mạng" là tự động tin được).
+"loai": nếu từ slide thì LUÔN là "slide". Nếu từ mạng, chọn ĐÚNG 1 trong 4 giá trị sau theo đúng bậc đã
+đánh giá ở khối NGUỒN TÌM ĐƯỢC TRÊN MẠNG: "tai-lieu-chinh-thuc" (tài liệu chính thức/tổ chức giáo dục),
+"bai-bao-khoa-hoc" (bài báo khoa học), "bao-chi" (báo/tạp chí công nghệ có biên tập), "blog-ca-nhan" (blog
+cá nhân/nguồn không rõ tác giả) — KHÔNG dùng chữ "web" chung chung nữa.
+"trangThai": LUÔN là "dang-dung" cho mọi nguồn bạn tạo ra ở đây (giá trị "bi-loai" chỉ do hệ thống tự gắn
+sau khi người dùng loại nguồn, không phải việc của bạn).
+Thêm 2 trường vào MỖI "nguon":
+- "ngayLayVe": LUÔN dùng đúng giá trị "{thoi_diem_hien_tai}" (thời điểm thật hiện tại, không tự đoán/bịa
+  ngày khác) cho mọi nguồn, kể cả slide.
+- "canhBao": (tuỳ chọn, CHỈ thêm nếu thật sự có lý do) mảng các câu cảnh báo ngắn nếu "ngayDang" của nguồn
+  đã khá cũ so với tốc độ thay đổi của chủ đề (đặc biệt chủ đề về giá/chi phí model AI, phiên bản phần
+  mềm, số liệu thị trường — những thứ đổi theo tháng) — ví dụ: "Số liệu năm 2023, có thể đã lỗi thời với
+  chủ đề đổi nhanh này, nên đối chiếu thêm trước khi dùng." Không thêm nếu không có lý do thật.
 Với mỗi thông tin trích ra, ghi vào mảng "thongTin" của "hoSo": mỗi thông tin có id (chuỗi ngắn tự đặt, duy
 nhất), noiDung, loai, và mảng "bangChung" gồm các {{"nguonId": <đúng id trong "nguon" ở trên>, "doanTrich":
 <trích NGUYÊN VĂN, chính xác từng chữ từ đúng khối TEXT tương ứng ở trên>, "viTri": <vị trí, ví dụ "trang
@@ -208,4 +221,45 @@ Danh sách cặp cần chấm (JSON):
 
 Trả về ĐÚNG JSON, không thêm chữ nào khác:
 {{"ketQua": [{{"n": <số câu>, "nhan": "khop"|"lech-nhe"|"lech-noi-dung", "mucNghiemTrong": "thap"|"trung-binh"|"cao", "giaiThich": "<1 câu ngắn, cụ thể chỗ nào khác nếu có>"}}, ...]}}
+"""
+
+QA_CONTENT_FROM_TRANSCRIPT_PROMPT = """Bạn là người kiểm tra nội dung video bài giảng đã dựng so với kịch
+bản đã duyệt (Feature B). Đúng quy trình thật của đội QA/QC: nghe lại video, chuyển thành văn bản, rồi đối
+chiếu văn bản đó với kịch bản — bạn đang làm bước đối chiếu đó, thay cho việc con người ngồi nghe tay.
+
+KỊCH BẢN ĐÃ DUYỆT (danh sách câu theo đúng thứ tự, mỗi câu có số "n" và lời "loi"):
+{script_json}
+
+BẢN CHÉP LỜI THẬT của video đã dựng (nghe được từ audio thật, viết liền mạch không chia sẵn theo câu):
+{transcript_text}
+
+Nhiệm vụ: với MỖI câu trong kịch bản, tìm đúng đoạn tương ứng trong bản chép lời (dựa theo đúng thứ tự
+xuất hiện trong bản chép lời và nội dung gần giống nhất), rồi so sánh NGỮ NGHĨA (không so chữ tuyệt đối):
+- "khop": ý giữ nguyên hệt, chỉ khác cách diễn đạt bình thường hoặc giống hệt.
+- "lech-nhe": diễn đạt khác nhiều hơn nhưng Ý CHÍNH vẫn giữ nguyên, KHÔNG đổi số liệu/tên riêng/kết luận.
+- "lech-noi-dung": số liệu, tên riêng, hoặc ý/kết luận đã ĐỔI KHÁC so với bản duyệt.
+- "thieu": không tìm thấy đoạn nào trong bản chép lời tương ứng với câu này (có thể bị cắt/bỏ sót khi thu).
+
+Trả về ĐÚNG JSON, không thêm chữ nào khác:
+{{"ketQua": [{{"n": <số câu>, "nhan": "khop"|"lech-nhe"|"lech-noi-dung"|"thieu", "mucNghiemTrong": "thap"|"trung-binh"|"cao", "giaiThich": "<1 câu ngắn, trích đúng đoạn tương ứng tìm được trong bản chép lời nếu có>"}}, ...]}}
+"""
+
+EXPAND_SCRIPT_PROMPT = """Bạn nhận một kịch bản ĐÃ ĐÚNG CHUẨN, mỗi câu đã có trích dẫn nguồn thật hoặc là
+câu chuyển ý — nhiệm vụ CHỈ là chèn thêm câu MỚI xen giữa để kéo dài kịch bản theo phong cách 3Blue1Brown
+(dùng ví dụ minh hoạ/liên hệ/giải thích ý nghĩa GIẢ ĐỊNH, không phải thêm sự thật cụ thể mới) — TUYỆT ĐỐI
+KHÔNG được sửa bất kỳ chữ nào trong các câu đã có, chỉ được CHÈN THÊM câu mới.
+
+Mỗi câu MỚI phải:
+- "nguon": [] LUÔN (không được trích dẫn nguồn nào, vì đây là ví dụ giả định, không phải sự thật cần nguồn)
+- KHÔNG chứa bất kỳ số liệu, tên riêng cụ thể, hay sự kiện cụ thể nào — chỉ giải thích ý nghĩa hoặc dùng ví
+  dụ minh hoạ chung chung (vd: "giống như...", "hãy tưởng tượng...", "điều này có nghĩa là...")
+- KHÔNG chứa chữ số trong "loi" (máy đọc thành tiếng — nếu bắt buộc phải nhắc số thì viết bằng chữ)
+- "chuTrenManHinh" tối đa 40 ký tự, "yDoHinh" mô tả ngắn hình minh hoạ phù hợp
+
+Kịch bản gốc, mỗi câu có n/phan/loi/chuTrenManHinh/yDoHinh/nguon (JSON):
+{kich_ban_json}
+
+Trả về ĐÚNG JSON, không thêm chữ nào khác: {{"cauMoRong": [<TOÀN BỘ câu theo đúng thứ tự cuối cùng, gồm cả
+câu gốc (giữ NGUYÊN VĂN 100% mọi trường, kể cả "nguon") lẫn câu mới chèn thêm, đánh lại "n" tăng dần liên
+tục từ 1 cho cả kịch bản sau khi chèn>]}}
 """

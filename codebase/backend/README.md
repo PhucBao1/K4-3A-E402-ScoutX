@@ -24,6 +24,10 @@ tự tìm nguồn trên mạng để viết toàn bộ kịch bản, đúng cơ 
 | `POST /generate` | Sinh hồ sơ tài liệu + kịch bản từ đầu (chủ đề, mục tiêu, đối tượng, thời lượng, slide tuỳ chọn) |
 | `POST /add-source` | Người dùng tự thêm 1 nguồn (URL + đoạn trích tự dán), viết lại có dùng nguồn đó nếu liên quan |
 | `POST /rewrite` | Loại 1 nguồn khỏi hồ sơ → chỉ viết lại đúng những câu phụ thuộc nguồn đó |
+| `POST /expand-script` | Lượt AI riêng, chèn thêm câu minh hoạ (không trích dẫn) để kịch bản dài/phong phú hơn |
+| `POST /qa-content` | Feature B (thử nghiệm) — gõ tay câu "lời trong video" để test AI phát hiện lệch nội dung |
+| `POST /qa-content-from-audio` | Feature B thật — upload audio/video, Whisper tự nghe rồi đối chiếu với kịch bản |
+| `POST /render-video` | Bonus — dựng video thật từ kịch bản (TTS + ảnh minh hoạ AI vẽ theo `yDoHinh`) |
 
 ## Chi phí ước tính mỗi lần chạy
 
@@ -34,8 +38,13 @@ Dùng `gpt-4o-mini` cho mọi lượt gọi (rẻ nhất trong dòng model có v
 
 **Ước tính ~0,01-0,03 USD/lần chạy `/generate`** (không có slide thì rẻ hơn vì không gửi ảnh; có slide
 kèm ảnh "low detail" thì nhỉnh hơn chút, vẫn dưới mức trên do dùng ảnh độ phân giải thấp cố định).
-`render_video.py` (bonus dựng video) tốn thêm phí TTS (`tts-1`) theo độ dài lời đọc — với kịch bản 5 câu
-(~30 giây audio) chi phí TTS dưới 0,01 USD.
+
+`/render-video` (bonus) tốn thêm: TTS (`tts-1`) theo độ dài lời đọc (~5 câu dưới 0,01 USD) **+ ảnh minh
+hoạ AI vẽ mỗi câu** (`gpt-image-1`, ~0,02-0,04 USD/ảnh) — kịch bản 10-12 câu tốn khoảng 0,3-0,5 USD cho
+riêng phần ảnh. Vẽ lỗi thì tự rớt về khung chữ tĩnh, không tốn thêm phí.
+
+`/qa-content-from-audio` tốn thêm phí Whisper (`whisper-1`, tính theo phút audio, rất rẻ) + 1 lượt
+`gpt-4o-mini` so sánh.
 
 *Số trên là ước tính dựa trên độ dài prompt/response thực tế quan sát khi test, không phải số chính thức
 từ OpenAI — chạy thật và xem dashboard OpenAI để có số chính xác cho tài khoản của bạn.*
@@ -48,6 +57,7 @@ từ OpenAI — chạy thật và xem dashboard OpenAI để có số chính xá
 - AI đôi khi trả lời chung chung thay vì liệt kê cụ thể khi được yêu cầu chi tiết (xem case #7, #18 trong
   `eval/golden-set.md`).
 - Khi mục tiêu hoàn toàn ngoài phạm vi, AI cải thiện nhưng chưa từ chối tường minh 100% các lần.
-- Chưa có UI để người duyệt CHỌN giữa 2 nguồn đang mâu thuẫn (`moTaMauThuan`) — mới có ở dạng dữ liệu, chưa
-  có màn hình riêng.
-- `render_video.py` chỉ tạo khung hình tĩnh (chữ trên nền màu), không có animation theo `yDoHinh`.
+- `render_video.py` vẽ ảnh minh hoạ TĨNH theo `yDoHinh` (không phải animation/chuyển động thật).
+- `canhBao` (cảnh báo nguồn cũ) có trong schema nhưng AI áp dụng không đều — xem `eval/golden-set.md`.
+- `/rewrite` gọi lại web search mỗi lần, có thể khiến trích dẫn cũ (câu không đổi) fail giả khi validate
+  lại với kết quả search mới — xem `eval/golden-set.md` case 25.

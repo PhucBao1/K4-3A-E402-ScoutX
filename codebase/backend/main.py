@@ -3,6 +3,7 @@ import json
 import os
 import re
 import tempfile
+from datetime import datetime
 
 import pymupdf as fitz  # PyMuPDF
 from dotenv import load_dotenv
@@ -14,8 +15,10 @@ from openai import OpenAI
 from render_video import render as render_video_to_mp4
 
 from prompt import (
+    EXPAND_SCRIPT_PROMPT,
     JUDGE_RELEVANCE_PROMPT,
     PROMPT_TEMPLATE,
+    QA_CONTENT_FROM_TRANSCRIPT_PROMPT,
     QA_CONTENT_PROMPT,
     RETRY_SUFFIX,
     REWRITE_PROMPT_TEMPLATE,
@@ -132,24 +135,21 @@ def find_ungrounded_numbers(data: dict, source_text: str) -> list[str]:
     for t in ho_so.get("thongTin", []):
         for bc in t.get("bangChung", []):
             raw = bc.get("doanTrich", "") or ""
-            is_web = source_loai_by_id.get(bc.get("nguonId")) == "web"
+            # "loai" giờ chi tiết hơn ("tai-lieu-chinh-thuc"/"bai-bao-khoa-hoc"/"bao-chi"/
+            # "blog-ca-nhan" thay vì chỉ "web") — bất kỳ giá trị nào KHÁC "slide" đều là nguồn mạng
+            is_web = source_loai_by_id.get(bc.get("nguonId")) not in (None, "slide")
             if not NUMBER_PATTERN.search(raw) and not is_web:
                 continue  # không có số, và không phải nguồn web → rủi ro thấp, không bắt buộc khớp tuyệt đối
             doan_trich = _normalize_ws(LEAD_IN_PREFIX.sub("", raw))
             if len(doan_trich) >= 4 and doan_trich not in norm_source:
                 problems.append(f"thongTin {t.get('id')} trích dẫn không khớp text gốc (nguồn {'web' if is_web else 'slide'}): \"{doan_trich[:60]}...\"")
 
-    # Layer 4b — số liệu trong LỜI ĐỌC của câu phải nằm trong đúng "doanTrich" mà câu đó trích
-    # dẫn (không phải "noiDung" — vì noiDung là AI tự diễn giải, có thể lẫn số bịa vào đó)
+    # Layer 4b — số liệu trong LỜI ĐỌC (và giờ cả CHỮ TRÊN MÀN HÌNH) của câu phải nằm trong đúng
+    # "doanTrich" mà câu đó trích dẫn (không phải "noiDung" — vì noiDung là AI tự diễn giải, có
+    # thể lẫn số bịa vào đó). "chuTrenManHinh" thêm sau khi phát hiện: không lớp nào từng kiểm
+    # trường này dù nó cũng hiện số liệu ra màn hình cho người xem — AI có thể vô tình để lệch số
+    # giữa "loi" (đã validate) và "chuTrenManHinh" (chưa từng validate) mà không ai bắt được.
     for cau in data.get("kichBan", {}).get("cau", []):
-        loi = cau.get("loi", "") or ""
-        # .rstrip(",.") — regex bắt số hay dính dấu phẩy/chấm cuối câu ("2017," thay vì "2017"),
-        # phát hiện thật khi test case 9 (mốc lịch sử) khiến so khớp sai hàng loạt vì lỗi này
-        numbers = {n.strip().rstrip(",.") for n in NUMBER_PATTERN.findall(loi)}
-        numbers = {n for n in numbers if len(n) >= 2}
-        if not numbers:
-            continue
-
         cited_evidence = ""
         for tid in _as_list(cau.get("nguon")):
             t = thongtin_by_id.get(tid)
@@ -159,11 +159,17 @@ def find_ungrounded_numbers(data: dict, source_text: str) -> list[str]:
                 cited_evidence += " " + (bc.get("doanTrich", "") or "")
         cited_evidence = _normalize_ws(cited_evidence)
 
-        for num in numbers:
-            if num not in cited_evidence:
-                problems.append(
-                    f"Câu {cau.get('n')} nói số '{num}' nhưng đoạn trích dẫn của câu đó không có số này"
-                )
+        for field in ("loi", "chuTrenManHinh"):
+            text = cau.get(field, "") or ""
+            # .rstrip(",.") — regex bắt số hay dính dấu phẩy/chấm cuối câu ("2017," thay vì "2017"),
+            # phát hiện thật khi test case 9 (mốc lịch sử) khiến so khớp sai hàng loạt vì lỗi này
+            numbers = {n.strip().rstrip(",.") for n in NUMBER_PATTERN.findall(text)}
+            numbers = {n for n in numbers if len(n) >= 2}
+            for num in numbers:
+                if num not in cited_evidence:
+                    problems.append(
+                        f"Câu {cau.get('n')} có số '{num}' trong '{field}' nhưng đoạn trích dẫn của câu đó không có số này"
+                    )
     return problems
 
 
@@ -342,11 +348,99 @@ def check_content_conformance(pairs: list[dict]) -> list[dict]:
     }) for p in pairs]
 
 
+def expand_script_with_analogy(kich_ban: dict) -> dict:
+    """Lượt AI THỨ HAI, tách riêng khỏi sinh nội dung chính — chỉ chèn thêm câu diễn giải/ví dụ
+    minh hoạ (nguon: []) để kéo dài kịch bản theo phong cách 3Blue1Brown, không đụng câu gốc đã
+    validate xong ở lượt 1. An toàn tuyệt đối: lỗi bất kỳ đâu (API lỗi, AI sửa câu gốc, câu mới vi
+    phạm luật) đều TỰ ĐỘNG rớt về kịch bản gốc — không bao giờ làm hỏng kết quả chính. Tách làm 2
+    lượt vì nhồi việc "kéo dài" vào chung 1 prompt với việc "trích dẫn đúng" đã thử 2 lần đều thất
+    bại (AI bắt đầu bịa/gắn sai nguồn để đủ dài) — xem eval/golden-set.md case 24."""
+    original_cau = kich_ban.get("cau", [])
+    if not original_cau:
+        return kich_ban
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": EXPAND_SCRIPT_PROMPT.format(
+                kich_ban_json=json.dumps(original_cau, ensure_ascii=False))}],
+            response_format={"type": "json_object"},
+        )
+        parsed = json.loads(resp.choices[0].message.content)
+        expanded_cau = parsed.get("cauMoRong", [])
+
+        # Guard 1: mọi câu gốc phải còn nguyên văn (so theo "loi") — không câu nào bị sửa/mất
+        original_loi_set = {c.get("loi") for c in original_cau if c.get("loi")}
+        expanded_loi_set = {c.get("loi") for c in expanded_cau if c.get("loi")}
+        if not original_loi_set.issubset(expanded_loi_set):
+            return kich_ban
+
+        # Guard 2: câu MỚI (không có trong bản gốc) phải "nguon": [] và không chữ số trong "loi"
+        for c in expanded_cau:
+            if c.get("loi") not in original_loi_set:
+                if _as_list(c.get("nguon")):
+                    return kich_ban
+                if c.get("loi") and re.search(r"\d", c["loi"]):
+                    return kich_ban
+
+        new_kich_ban = dict(kich_ban)
+        new_kich_ban["cau"] = expanded_cau
+        return new_kich_ban
+    except Exception:
+        return kich_ban
+
+
 @app.post("/qa-content")
 async def qa_content_endpoint(pairs_json: str = Form(...)):
     """pairs_json: JSON list [{"n": 1, "loiGoc": "...", "loiTrongVideo": "..."}, ...]"""
     pairs = json.loads(pairs_json)
     return {"ketQua": check_content_conformance(pairs)}
+
+
+def transcribe_audio(file_bytes: bytes, filename: str) -> str:
+    """Bước "nghe lại video" của lab coach A (BA.md mục 2) — tự động hoá bằng Whisper, cùng
+    OpenAI key hiện có. mp4/mp3/wav/m4a/webm đều được Whisper API hỗ trợ trực tiếp, không cần
+    tự tách audio bằng ffmpeg trước."""
+    tmp_path = tempfile.mktemp(suffix=os.path.splitext(filename)[1] or ".mp4")
+    with open(tmp_path, "wb") as f:
+        f.write(file_bytes)
+    try:
+        with open(tmp_path, "rb") as f:
+            result = client.audio.transcriptions.create(model="whisper-1", file=f)
+        return result.text
+    finally:
+        os.remove(tmp_path)
+
+
+def check_content_conformance_from_transcript(cau_list: list[dict], transcript_text: str) -> list[dict]:
+    """Feature B, đường thật: thay vì người dùng gõ tay giả lập câu lệch (check_content_conformance),
+    lấy đúng bản chép lời THẬT từ audio/video người dùng upload (qua transcribe_audio) rồi để AI tự
+    đối chiếu — đúng 3 bước lab coach A mô tả: nghe, chuyển văn bản, đối chiếu, AI làm hết."""
+    script = [{"n": c["n"], "loi": c["loi"]} for c in cau_list if c.get("loi")]
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": QA_CONTENT_FROM_TRANSCRIPT_PROMPT.format(
+            script_json=json.dumps(script, ensure_ascii=False), transcript_text=transcript_text)}],
+        response_format={"type": "json_object"},
+    )
+    parsed = json.loads(resp.choices[0].message.content)
+    results_by_n = {r["n"]: r for r in parsed.get("ketQua", [])}
+    return [results_by_n.get(c["n"], {
+        "n": c["n"], "nhan": "loi", "mucNghiemTrong": "khong-ro", "giaiThich": "Không chấm được",
+    }) for c in script]
+
+
+@app.post("/qa-content-from-audio")
+async def qa_content_from_audio_endpoint(
+    kich_ban_json: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """Đường thật của Feature B — xem check_content_conformance_from_transcript()."""
+    kich_ban = json.loads(kich_ban_json)
+    audio_bytes = await file.read()
+    transcript_text = transcribe_audio(audio_bytes, file.filename or "audio.mp4")
+    results = check_content_conformance_from_transcript(kich_ban.get("cau", []), transcript_text)
+    return {"ketQua": results, "transcript": transcript_text}
 
 
 @app.post("/generate")
@@ -373,6 +467,7 @@ async def generate(
     prompt_text = PROMPT_TEMPLATE.format(
         topic=topic, goal=goal, audience=audience, duration=duration,
         target_sentences=estimate_target_sentences(duration),
+        thoi_diem_hien_tai=datetime.now().astimezone().isoformat(timespec="seconds"),
         slide_text=source_text or "(người dùng không upload slide — dùng nguồn mạng làm nguồn chính)",
         web_text=web_text or "(không tìm được nguồn ngoài, chỉ dùng slide)",
     )
@@ -434,6 +529,7 @@ async def add_source(
     prompt_text = PROMPT_TEMPLATE.format(
         topic=topic, goal=goal, audience=audience, duration=duration,
         target_sentences=estimate_target_sentences(duration),
+        thoi_diem_hien_tai=datetime.now().astimezone().isoformat(timespec="seconds"),
         slide_text=source_text or "(người dùng không upload slide — dùng nguồn mạng làm nguồn chính)",
         web_text=web_text_combined,
     ) + (
@@ -476,10 +572,22 @@ async def rewrite(
     ho_so = json.loads(ho_so_json)
     kich_ban = json.loads(kich_ban_json)
 
+    # Đúng schema chính thức (vi-du/ho-so-nguon-mau.json của BTC): nguồn bị loại KHÔNG bị xoá khỏi
+    # hồ sơ, chỉ đánh dấu trangThai="bi-loai" + lyDoLoai — giữ dấu vết audit cho giám khảo xem lại
+    # thay vì âm thầm biến mất khỏi dữ liệu.
+    removed_source = next((s for s in ho_so.get("nguon", []) if s["id"] == removed_source_id), None)
+    removed_source_marked = None
+    if removed_source is not None:
+        removed_source_marked = dict(removed_source)
+        removed_source_marked["trangThai"] = "bi-loai"
+        removed_source_marked["lyDoLoai"] = "Người duyệt loại nguồn này qua giao diện xem hồ sơ tài liệu."
+
     affected_thongtin_ids = {
         t["id"] for t in ho_so.get("thongTin", [])
         if any(bc.get("nguonId") == removed_source_id for bc in t.get("bangChung", []))
     }
+    # remaining_ho_so — dùng để MỚM CHO AI biết nguồn/thông tin nào còn dùng được (không gồm nguồn
+    # vừa bị loại, để AI không lỡ trích lại nó); nguồn bị loại được cộng lại riêng vào output cuối.
     remaining_ho_so = {
         "nguon": [s for s in ho_so.get("nguon", []) if s["id"] != removed_source_id],
         "thongTin": [t for t in ho_so.get("thongTin", []) if t["id"] not in affected_thongtin_ids],
@@ -490,8 +598,12 @@ async def rewrite(
     ]
 
     if not affected_cau:
-        # không câu nào phụ thuộc nguồn bị loại — chỉ cần bỏ nguồn khỏi hồ sơ, kịch bản giữ nguyên
-        return {"hoSo": remaining_ho_so, "kichBan": kich_ban, "rewrittenNs": []}
+        # không câu nào phụ thuộc nguồn bị loại — chỉ cần đánh dấu nguồn "bi-loai", kịch bản giữ nguyên
+        final_nguon = remaining_ho_so["nguon"] + ([removed_source_marked] if removed_source_marked else [])
+        return {
+            "hoSo": {"nguon": final_nguon, "thongTin": remaining_ho_so["thongTin"]},
+            "kichBan": kich_ban, "rewrittenNs": [],
+        }
 
     if file is not None:
         pdf_bytes = await file.read()
@@ -514,13 +626,13 @@ async def rewrite(
     )
 
     last_error = None
-    for attempt_prompt in (rewrite_prompt, rewrite_prompt + REWRITE_RETRY_SUFFIX):
+    for attempt_prompt in (rewrite_prompt, rewrite_prompt + REWRITE_RETRY_SUFFIX, rewrite_prompt + REWRITE_RETRY_SUFFIX):
         try:
             patch = call_openai(attempt_prompt, images_b64)
 
             # Chặn ID trùng — bug thật đã gặp: AI đặt "thongTinMoi" trùng id với thongTin còn
             # lại (vd cả 2 đều "tt2"), làm hồ sơ có 2 bản ghi cùng id khác nội dung, hỏng dữ liệu
-            existing_source_ids = {s["id"] for s in remaining_ho_so["nguon"]}
+            existing_source_ids = {s["id"] for s in remaining_ho_so["nguon"]} | {removed_source_id}
             existing_thongtin_ids = {t["id"] for t in remaining_ho_so["thongTin"]}
             for s in patch.get("nguonMoi", []):
                 if s["id"] in existing_source_ids:
@@ -530,7 +642,8 @@ async def rewrite(
                     raise ValueError(f"thongTinMoi id '{t['id']}' trùng với thongTin đã có sẵn")
 
             new_ho_so = {
-                "nguon": remaining_ho_so["nguon"] + patch.get("nguonMoi", []),
+                "nguon": remaining_ho_so["nguon"] + patch.get("nguonMoi", [])
+                    + ([removed_source_marked] if removed_source_marked else []),
                 "thongTin": remaining_ho_so["thongTin"] + patch.get("thongTinMoi", []),
             }
             cau_by_n = {c["n"]: c for c in kich_ban.get("cau", [])}
@@ -568,6 +681,17 @@ async def render_video_endpoint(kich_ban_json: str = Form(...)):
         os.remove(out_path)
         raise HTTPException(status_code=502, detail=f"Dựng video lỗi: {e}")
     return FileResponse(out_path, media_type="video/mp4", filename="scriptscout-video.mp4")
+
+
+@app.post("/expand-script")
+async def expand_script_endpoint(kich_ban_json: str = Form(...)):
+    """Nút riêng, KHÔNG chạy tự động trong /generate — xem expand_script_with_analogy(). Trả về
+    kịch bản gốc y hệt nếu lượt mở rộng lỗi/vi phạm luật, kèm cờ "daMoRong" để UI biết có đổi gì
+    thật không (tránh báo "đã mở rộng" giả khi thực ra bị rớt về bản gốc)."""
+    kich_ban = json.loads(kich_ban_json)
+    expanded = expand_script_with_analogy(kich_ban)
+    da_mo_rong = len(expanded.get("cau", [])) > len(kich_ban.get("cau", []))
+    return {"kichBan": expanded, "daMoRong": da_mo_rong}
 
 
 # Static files (frontend) — MOUNT SAU CÙNG, sau mọi route API, để không nuốt mất /generate
