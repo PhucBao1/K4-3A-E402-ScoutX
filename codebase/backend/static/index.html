@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScriptScout</title>
+<style>
+  :root {
+    --ink: #1a1d23;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #f7f7f8;
+    --accent: #2563eb;
+    --accent-soft: #eff4ff;
+    --ok: #059669;
+    --warn: #b45309;
+    --warn-bg: #fffbeb;
+    --err: #b91c1c;
+    --err-bg: #fef2f2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--line);
+    background: #fff;
+  }
+  header h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  .banner {
+    padding: 8px 24px;
+    font-size: 12.5px;
+  }
+  .banner.warn { background: var(--warn-bg); color: var(--warn); border-bottom: 1px solid #fde68a; }
+  .banner.err { background: var(--err-bg); color: var(--err); border-bottom: 1px solid #fecaca; }
+  .banner.demo {
+    background: #1a1d23; color: #fff; text-align: center; font-weight: 700;
+    padding: 10px; display: none;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; margin-top: 12px; }
+  label:first-child { margin-top: 0; }
+  input, select {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+  .actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  button.primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.primary:disabled { background: #93b4f0; cursor: default; }
+  button.primary:hover:not(:disabled) { background: #1d4ed8; }
+
+  .export-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 4px; }
+  button.secondary {
+    background: #fff; color: var(--accent); border: 1px solid #c7d9fb;
+    padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  button.secondary:hover { background: var(--accent-soft); }
+  button.secondary:disabled { color: #9ca3af; border-color: var(--line); cursor: default; }
+
+  button.ghost {
+    background: #fff; color: var(--muted); border: 1px dashed var(--line);
+    padding: 8px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  button.ghost:hover { border-color: var(--muted); }
+
+  #loading { display: none; padding: 16px 0; color: var(--muted); font-size: 14px; }
+  #loading.show { display: block; }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: -2px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #errorBox { display: none; background: var(--err-bg); border: 1px solid #fecaca; color: var(--err);
+    border-radius: 8px; padding: 12px 14px; font-size: 13.5px; margin: 12px 0; }
+
+  #results { display: none; }
+  #results.show { display: block; }
+
+  .source-group-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin: 14px 0 6px; }
+  .source-group-title:first-of-type { margin-top: 0; }
+  .sources-list { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .source-chip {
+    background: var(--accent-soft); border: 1px solid #c7d9fb;
+    border-radius: 6px; padding: 8px 10px; font-size: 12.5px; flex: 1; min-width: 220px;
+    cursor: pointer;
+  }
+  .source-chip:hover { border-color: var(--accent); }
+  .source-chip b { display: block; font-size: 12px; color: var(--accent); margin-bottom: 2px; }
+  .source-chip span { color: var(--muted); word-break: break-word; }
+  .source-chip .chip-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  button.remove-source {
+    background: none; border: 1px solid #fecaca; color: var(--err);
+    font-size: 10.5px; padding: 2px 8px; border-radius: 10px; cursor: pointer; flex-shrink: 0;
+  }
+  button.remove-source:hover { background: var(--err-bg); }
+  button.remove-source:disabled { opacity: .5; cursor: default; }
+  .rewritten-badge {
+    display: inline-block; background: #d1fae5; color: var(--ok); font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 10px; margin-left: 6px; vertical-align: 2px;
+  }
+  .conf-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 6px;
+    border-radius: 10px; margin-left: 6px; vertical-align: 1px;
+  }
+  .conf-cao { background: #d1fae5; color: var(--ok); }
+  .conf-trung-binh { background: #fef3c7; color: var(--warn); }
+  .conf-thap { background: #fee2e2; color: #b91c1c; }
+  .proof-meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; font-size: 12.5px; margin-bottom: 10px; }
+  .proof-meta dt { color: var(--muted); }
+  .proof-meta dd { margin: 0; }
+
+  .sentence {
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    font-size: 14.5px;
+    line-height: 1.5;
+    transition: border-color .15s, background .15s;
+  }
+  .sentence:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .sentence.active { border-color: var(--accent); background: var(--accent-soft); }
+  .sentence.no-src { cursor: default; color: var(--muted); font-style: italic; }
+  .sentence.no-src:hover { border-color: var(--line); background: none; }
+  .sentence-meta { margin-top: 6px; font-size: 11.5px; color: var(--muted); font-style: normal; }
+  .cite {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: 2px;
+  }
+
+  #proof { display: none; }
+  #proof.show { display: block; }
+  #proof .proof-head { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  #proof .proof-body {
+    background: #fafafa; border: 1px dashed #cbd5e1; border-radius: 8px;
+    padding: 14px; font-size: 13.5px; line-height: 1.6;
+  }
+  .empty-hint { color: var(--muted); font-size: 13.5px; padding: 10px 0; }
+
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; }
+</style>
+</head>
+<body>
+
+<div class="banner demo" id="demoBanner">⚠️ ĐANG XEM DỮ LIỆU MẪU (DEMO OFFLINE) — KHÔNG PHẢI KẾT QUẢ AI VỪA CHẠY</div>
+
+<header>
+  <h1>ScriptScout</h1>
+  <p>Nhập chủ đề (slide là tuỳ chọn) → AI tự tìm nguồn, viết kịch bản video, mỗi câu gắn đúng nguồn — bấm vào câu hoặc nguồn để xem chứng minh.</p>
+</header>
+<div class="banner warn">
+  ℹ️ AI tự tìm 2-3 nguồn trên mạng theo chủ đề và chấm độ tin cậy từng nguồn; nếu có upload slide, AI đọc thêm slide làm nguồn bổ sung. Bấm "Loại nguồn này" trên 1 nguồn để yêu cầu AI viết lại đúng những câu phụ thuộc vào nguồn đó — các câu khác giữ nguyên.
+</div>
+<div class="banner warn">
+  ⚠️ Kịch bản do AI viết ra ĐÂY LÀ BẢN NHÁP — giảng viên/người duyệt phải xem lại và duyệt nội dung trước khi dùng để dựng thành video thật.
+</div>
+
+<main>
+  <div class="card">
+    <label for="topic">Chủ đề</label>
+    <input id="topic" placeholder="VD: Phân biệt AI, Machine Learning, Deep Learning, GenAI, LLM">
+
+    <label for="slideFile">Slide bài giảng (PDF) — không bắt buộc</label>
+    <input id="slideFile" type="file" accept="application/pdf">
+    <p style="font-size:0.85em;color:#666;margin-top:4px;">Không có slide? Bỏ trống — AI sẽ tự tìm nguồn trên mạng theo chủ đề, đúng như một agent nghiên cứu thật sự.</p>
+
+    <div class="row">
+      <div>
+        <label for="goal">Mục tiêu bài học</label>
+        <input id="goal" placeholder="VD: Học viên phân biệt được AI, ML, DL, GenAI, LLM">
+      </div>
+      <div>
+        <label for="audience">Đối tượng học</label>
+        <select id="audience">
+          <option>Học viên mới bắt đầu</option>
+          <option>Học viên đã có nền tảng lập trình</option>
+          <option>Giảng viên / Studio team</option>
+        </select>
+      </div>
+    </div>
+
+    <label for="duration">Thời lượng (phút)</label>
+    <input id="duration" type="number" value="3" min="1" max="60">
+
+    <div class="actions-row">
+      <button class="primary" id="runBtn">Đọc slide &amp; viết kịch bản</button>
+      <button class="ghost" id="demoBtn">Xem ví dụ demo offline</button>
+    </div>
+
+    <div id="loading"><span class="spinner"></span>Đang tìm nguồn và viết kịch bản…</div>
+    <div id="errorBox"></div>
+  </div>
+
+  <div class="card" id="results">
+    <h3 style="margin-top:0;">Hồ sơ tài liệu</h3>
+    <div id="sourcesArea"></div>
+
+    <button class="ghost" id="showAddSourceBtn" type="button" style="margin-top:8px;">+ Thêm nguồn của bạn</button>
+    <div id="addSourceForm" style="display:none; margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+      <label for="addSourceUrl">URL nguồn</label>
+      <input id="addSourceUrl" placeholder="https://...">
+      <label for="addSourceTitle">Tiêu đề</label>
+      <input id="addSourceTitle" placeholder="Tên bài viết/tài liệu">
+      <div class="row">
+        <div>
+          <label for="addSourceOrg">Tác giả/Tổ chức (nếu biết)</label>
+          <input id="addSourceOrg" placeholder="VD: Bộ Khoa học Công nghệ">
+        </div>
+        <div>
+          <label for="addSourceDate">Ngày đăng (nếu biết)</label>
+          <input id="addSourceDate" placeholder="VD: 2025-03-01">
+        </div>
+      </div>
+      <label for="addSourceExcerpt">Đoạn trích bạn muốn dùng làm bằng chứng</label>
+      <input id="addSourceExcerpt" placeholder="Dán nguyên văn đoạn quan trọng nhất từ trang đó">
+      <div class="actions-row">
+        <button class="primary" id="submitAddSourceBtn" type="button">Thêm và viết lại kịch bản</button>
+        <button class="ghost" id="cancelAddSourceBtn" type="button">Huỷ</button>
+      </div>
+    </div>
+
+    <h3>Kịch bản</h3>
+    <div id="sentenceList"></div>
+    <p class="empty-hint" id="clickHint">👆 Bấm vào một câu hoặc một nguồn bất kỳ để xem đúng chỗ chứng minh cho nó.</p>
+
+    <div class="export-row">
+      <button class="secondary" id="exportScriptBtn" disabled>⬇️ Xuất kịch bản (.json)</button>
+      <button class="secondary" id="exportSourcesBtn" disabled>⬇️ Xuất hồ sơ tài liệu (.json)</button>
+      <button class="primary" id="renderVideoBtn" disabled>🎬 Dựng video (bonus, tốn ~30-60 giây)</button>
+    </div>
+    <div id="videoArea" style="display:none; margin-top:10px;">
+      <video id="videoPlayer" controls style="max-width:100%; border-radius:6px;"></video>
+      <p style="font-size:0.85em;color:#666;">Video dựng từ TTS thật, khung hình tĩnh — không phải animation. Xem <code>codebase/backend/README.md</code> để biết giới hạn.</p>
+    </div>
+
+    <div id="qaContentSection" style="display:none; margin-top:16px; border-top:1px solid #ddd; padding-top:12px;">
+      <h3 style="margin-top:0;">🔍 QA nội dung: kiểm tra AI có phát hiện được lệch không? (Feature B — thử nghiệm, xem BA.md)</h3>
+      <p style="font-size:0.9em;color:#666;">⚠️ Đây là bài test giả lập, KHÔNG phải đối chiếu với video thật vừa dựng — video TTS ở trên đọc đúng y hệt kịch bản nên không có gì để so. Mục đích: giả sử sau này có người đọc thật (hoặc TTS khác) lỡ đọc SAI đi so với bản đã duyệt, AI có bắt được không? Hãy tự sửa cột "Lời trong video" bên dưới thành một câu SAI LỆCH (đổi số liệu, đổi ý...) rồi bấm kiểm tra để xem AI phát hiện đúng không.</p>
+      <div id="qaContentRows"></div>
+      <button class="primary" id="qaContentCheckBtn" style="margin-top:8px;">Kiểm tra đối chiếu</button>
+      <div id="qaContentResults" style="margin-top:10px;"></div>
+    </div>
+
+    <div id="proof">
+      <div class="proof-head">Đoạn chứng minh — <span id="proofSourceName"></span></div>
+      <dl class="proof-meta" id="proofMeta"></dl>
+      <div class="proof-body" id="proofBody"></div>
+    </div>
+  </div>
+</main>
+
+<footer>ScriptScout · Track C · Đề C3 · Nhóm ScoutX · Prototype mức Working (CP3)</footer>
+
+<script>
+// ---- App state (kết quả AI thật, không còn data cố định) ----
+const AppState = { hoSoJson: null, kichBanJson: null, sources: [], sentences: [], isDemo: false, lastRewrittenNs: [] };
+
+const GROUP_LABEL = {
+  slide: "Từ slide bài giảng (nguồn chính)",
+  paper: "Paper / nghiên cứu",
+  external: "Nguồn bên ngoài",
+  "bieu-do": "Biểu đồ",
+  "vi-du": "Ví dụ dẫn chứng"
+};
+const GROUP_ORDER = ["slide", "paper", "external", "bieu-do", "vi-du"];
+const LOAI_TO_GROUP = {
+  "slide": { type: "slide", icon: "🎞️" },
+  "web": { type: "external", icon: "🌐" },
+  "bai-bao-khoa-hoc": { type: "paper", icon: "📄" },
+  "tai-lieu-chinh-thuc": { type: "external", icon: "📄" },
+  "bao-chi": { type: "external", icon: "📰" },
+  "blog-ca-nhan": { type: "external", icon: "📰" }
+};
+const KIEU_LABEL = { ke: "kể", giang: "giảng", nhe: "thân mật", hoi: "hỏi", nhan: "chốt" };
+
+function asList(v) { if (v === null || v === undefined) return []; return Array.isArray(v) ? v : [v]; }
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function classifySource(loai) { return LOAI_TO_GROUP[loai] || { type: "external", icon: "📄" }; }
+
+// ---- Adapter: chuyển output AI thật (schema BTC) sang shape để render (giữ nguyên UI CP2) ----
+function mapOfficialToInternal(hoSo, kichBan) {
+  const nguonList = (hoSo && hoSo.nguon) || [];
+  const thongTinList = (hoSo && hoSo.thongTin) || [];
+
+  const sources = nguonList.map(n => {
+    const { type, icon } = classifySource(n.loai);
+    return {
+      id: n.id, type, icon, title: n.tieuDe || n.id,
+      to: n.toChuc || n.tacGia || '', ngay: n.ngayDang || '—',
+      doTinCay: n.doTinCay || 'trung-binh', ly: n.lyDoTinCay || '',
+      url: n.url || null, excerpt: ''
+    };
+  });
+  const sourceById = {};
+  sources.forEach(s => { sourceById[s.id] = s; });
+
+  thongTinList.forEach(t => {
+    (t.bangChung || []).forEach(bc => {
+      const src = sourceById[bc.nguonId];
+      if (!src) return;
+      src.excerpt += `<div style="margin-bottom:8px;"><b>${escapeHtml(t.noiDung)}</b><br>` +
+        `${escapeHtml(bc.doanTrich)}${bc.viTri ? ' <i>(' + escapeHtml(bc.viTri) + ')</i>' : ''}</div>`;
+    });
+  });
+  sources.forEach(s => { if (!s.excerpt) s.excerpt = '(chưa có trích dẫn cụ thể)'; });
+
+  const thongTinToSourceId = {};
+  thongTinList.forEach(t => {
+    const first = (t.bangChung || [])[0];
+    thongTinToSourceId[t.id] = first ? first.nguonId : null;
+  });
+
+  const sentences = ((kichBan && kichBan.cau) || []).map(c => {
+    const nguonIds = asList(c.nguon);
+    const primary = nguonIds.length ? thongTinToSourceId[nguonIds[0]] : null;
+    return {
+      n: c.n, phan: c.phan, kieu: KIEU_LABEL[c.kieu] || c.kieu || 'giảng',
+      text: c.loi || (c.dungGiay ? `(dừng ${c.dungGiay} giây)` : ''),
+      manHinh: c.chuTrenManHinh || '', yDoHinh: c.yDoHinh || '',
+      src: primary || null
+    };
+  });
+
+  return { sources, sentences };
+}
+
+function downloadJSON(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+const runBtn = document.getElementById('runBtn');
+const demoBtn = document.getElementById('demoBtn');
+const showAddSourceBtn = document.getElementById('showAddSourceBtn');
+const cancelAddSourceBtn = document.getElementById('cancelAddSourceBtn');
+const submitAddSourceBtn = document.getElementById('submitAddSourceBtn');
+showAddSourceBtn.addEventListener('click', () => {
+  document.getElementById('addSourceForm').style.display = 'block';
+});
+cancelAddSourceBtn.addEventListener('click', () => {
+  document.getElementById('addSourceForm').style.display = 'none';
+});
+submitAddSourceBtn.addEventListener('click', addSourceAndRegenerate);
+const loading = document.getElementById('loading');
+const errorBox = document.getElementById('errorBox');
+const demoBanner = document.getElementById('demoBanner');
+const results = document.getElementById('results');
+const sourcesArea = document.getElementById('sourcesArea');
+const sentenceList = document.getElementById('sentenceList');
+const proof = document.getElementById('proof');
+const proofBody = document.getElementById('proofBody');
+const proofMeta = document.getElementById('proofMeta');
+const proofSourceName = document.getElementById('proofSourceName');
+const clickHint = document.getElementById('clickHint');
+const exportScriptBtn = document.getElementById('exportScriptBtn');
+const exportSourcesBtn = document.getElementById('exportSourcesBtn');
+const renderVideoBtn = document.getElementById('renderVideoBtn');
+const videoArea = document.getElementById('videoArea');
+const videoPlayer = document.getElementById('videoPlayer');
+
+function confClass(doTinCay) { return "conf-" + String(doTinCay).replace(/\s+/g, "-"); }
+
+function renderSources() {
+  const byType = {};
+  AppState.sources.forEach(s => { (byType[s.type] = byType[s.type] || []).push(s); });
+  const canRemove = AppState.sources.length > 1 && !AppState.isDemo;
+
+  sourcesArea.innerHTML = GROUP_ORDER.filter(t => byType[t]).map(t => `
+    <div class="source-group-title">${GROUP_LABEL[t]}</div>
+    <div class="sources-list">
+      ${byType[t].map(s => `
+        <div class="source-chip" data-src="${s.id}">
+          <b>${s.icon} ${escapeHtml(s.title)}<span class="conf-badge ${confClass(s.doTinCay)}">${escapeHtml(s.doTinCay)}</span></b>
+          <span>${escapeHtml(s.to)}${s.ngay && s.ngay !== "—" ? " · " + escapeHtml(s.ngay) : ""}</span>
+          <div class="chip-footer">
+            <span></span>
+            <button class="remove-source" data-remove-src="${s.id}" ${canRemove ? '' : 'disabled'}>✕ Loại nguồn này</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.source-chip').forEach(el => {
+    el.addEventListener('click', (ev) => {
+      if (ev.target.closest('button')) return; // đừng mở proof khi bấm nút loại nguồn
+      showProofBySource(el.dataset.src);
+    });
+  });
+  document.querySelectorAll('.remove-source').forEach(el => {
+    el.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      removeSourceAndRewrite(el.dataset.removeSrc);
+    });
+  });
+}
+
+function renderSentences() {
+  sentenceList.innerHTML = AppState.sentences.map((s, i) => {
+    const source = s.src ? AppState.sources.find(x => x.id === s.src) : null;
+    const cite = source ? `<span class="cite">${source.icon} ${escapeHtml(source.title)}</span>` : '';
+    const rewritten = AppState.lastRewrittenNs.includes(s.n) ? `<span class="rewritten-badge">✎ vừa viết lại</span>` : '';
+    const clickable = s.src ? 'sentence' : 'sentence no-src';
+    return `<div class="${clickable}" data-idx="${i}">
+      <div>${escapeHtml(s.text)}${cite}${rewritten}</div>
+      <div class="sentence-meta">Kiểu: ${escapeHtml(s.kieu)} · Trên màn hình: "${escapeHtml(s.manHinh)}"</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.sentence').forEach(el => {
+    el.addEventListener('click', () => {
+      const s = AppState.sentences[parseInt(el.dataset.idx)];
+      if (!s.src) return;
+      document.querySelectorAll('.sentence').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+      showProofBySource(s.src);
+    });
+  });
+}
+
+function showProofBySource(srcId) {
+  const source = AppState.sources.find(x => x.id === srcId);
+  if (!source) return;
+  proofSourceName.textContent = `${source.icon} ${source.title}`;
+
+  proofMeta.innerHTML = `
+    <dt>Loại</dt><dd>${GROUP_LABEL[source.type] || source.type}</dd>
+    <dt>Tác giả / tổ chức</dt><dd>${escapeHtml(source.to)}</dd>
+    <dt>Ngày</dt><dd>${escapeHtml(source.ngay)}</dd>
+    <dt>Độ tin cậy</dt><dd><span class="conf-badge ${confClass(source.doTinCay)}">${escapeHtml(source.doTinCay)}</span> — ${escapeHtml(source.ly)}</dd>
+    ${source.url ? `<dt>Nguồn</dt><dd>${escapeHtml(source.url)}</dd>` : ''}
+  `;
+  proofBody.innerHTML = source.excerpt;
+  proof.classList.add('show');
+  clickHint.style.display = 'none';
+}
+
+function showError(msg) {
+  errorBox.textContent = '⚠️ ' + msg;
+  errorBox.style.display = 'block';
+}
+
+async function removeSourceAndRewrite(sourceId) {
+  const fileInput = document.getElementById('slideFile');
+  errorBox.style.display = 'none';
+  loading.innerHTML = '<span class="spinner"></span>Đang viết lại các câu phụ thuộc nguồn vừa loại…';
+  loading.classList.add('show');
+
+  const formData = new FormData();
+  if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+  formData.append('topic', document.getElementById('topic').value);
+  formData.append('goal', document.getElementById('goal').value);
+  formData.append('audience', document.getElementById('audience').value);
+  formData.append('duration', document.getElementById('duration').value);
+  formData.append('ho_so_json', JSON.stringify(AppState.hoSoJson));
+  formData.append('kich_ban_json', JSON.stringify(AppState.kichBanJson));
+  formData.append('removed_source_id', sourceId);
+
+  try {
+    const res = await fetch('/rewrite', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    AppState.hoSoJson = data.hoSo;
+    AppState.kichBanJson = data.kichBan;
+    AppState.lastRewrittenNs = data.rewrittenNs || [];
+
+    const mapped = mapOfficialToInternal(data.hoSo, data.kichBan);
+    AppState.sources = mapped.sources;
+    AppState.sentences = mapped.sentences;
+
+    renderSources();
+    renderSentences();
+    renderQaContentRows();
+    proof.classList.remove('show');
+    clickHint.style.display = 'block';
+  } catch (err) {
+    showError(err.message || 'Không viết lại được, vui lòng thử lại.');
+  } finally {
+    loading.classList.remove('show');
+    loading.innerHTML = '<span class="spinner"></span>Đang tìm nguồn và viết kịch bản…';
+  }
+}
+
+async function addSourceAndRegenerate() {
+  const url = document.getElementById('addSourceUrl').value.trim();
+  const title = document.getElementById('addSourceTitle').value.trim();
+  const excerpt = document.getElementById('addSourceExcerpt').value.trim();
+  if (!url || !title || !excerpt) {
+    showError('Cần nhập đủ URL, tiêu đề và đoạn trích để thêm nguồn.');
+    return;
+  }
+  const fileInput = document.getElementById('slideFile');
+  errorBox.style.display = 'none';
+  loading.innerHTML = '<span class="spinner"></span>Đang thêm nguồn và viết lại kịch bản…';
+  loading.classList.add('show');
+
+  const formData = new FormData();
+  if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+  formData.append('topic', document.getElementById('topic').value);
+  formData.append('goal', document.getElementById('goal').value);
+  formData.append('audience', document.getElementById('audience').value);
+  formData.append('duration', document.getElementById('duration').value);
+  formData.append('source_url', url);
+  formData.append('source_title', title);
+  formData.append('source_excerpt', excerpt);
+  formData.append('source_org', document.getElementById('addSourceOrg').value);
+  formData.append('source_date', document.getElementById('addSourceDate').value);
+
+  try {
+    const res = await fetch('/add-source', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    AppState.hoSoJson = data.hoSo;
+    AppState.kichBanJson = data.kichBan;
+    const mapped = mapOfficialToInternal(data.hoSo, data.kichBan);
+    AppState.sources = mapped.sources;
+    AppState.sentences = mapped.sentences;
+
+    renderSources();
+    renderSentences();
+    renderQaContentRows();
+    document.getElementById('addSourceForm').style.display = 'none';
+    ['addSourceUrl', 'addSourceTitle', 'addSourceOrg', 'addSourceDate', 'addSourceExcerpt']
+      .forEach(id => { document.getElementById(id).value = ''; });
+  } catch (err) {
+    showError(err.message || 'Không thêm được nguồn, vui lòng thử lại.');
+  } finally {
+    loading.classList.remove('show');
+    loading.innerHTML = '<span class="spinner"></span>Đang tìm nguồn và viết kịch bản…';
+  }
+}
+
+function resetViewBeforeRun() {
+  results.classList.remove('show');
+  proof.classList.remove('show');
+  clickHint.style.display = 'block';
+  errorBox.style.display = 'none';
+  demoBanner.style.display = 'none';
+  AppState.isDemo = false;
+  AppState.lastRewrittenNs = [];
+}
+
+runBtn.addEventListener('click', async () => {
+  const fileInput = document.getElementById('slideFile');
+  const topicInput = document.getElementById('topic');
+  if (!topicInput.value.trim()) { showError('Vui lòng nhập chủ đề trước.'); return; }
+
+  resetViewBeforeRun();
+  loading.classList.add('show');
+  runBtn.disabled = true;
+  exportScriptBtn.disabled = true;
+  exportSourcesBtn.disabled = true;
+  renderVideoBtn.disabled = true;
+  videoArea.style.display = 'none';
+
+  const formData = new FormData();
+  if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+  formData.append('topic', topicInput.value);
+  formData.append('goal', document.getElementById('goal').value);
+  formData.append('audience', document.getElementById('audience').value);
+  formData.append('duration', document.getElementById('duration').value);
+
+  try {
+    const res = await fetch('/generate', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    AppState.hoSoJson = data.hoSo;
+    AppState.kichBanJson = data.kichBan;
+    const mapped = mapOfficialToInternal(data.hoSo, data.kichBan);
+    AppState.sources = mapped.sources;
+    AppState.sentences = mapped.sentences;
+
+    renderSources();
+    renderSentences();
+    renderQaContentRows();
+    results.classList.add('show');
+    exportScriptBtn.disabled = false;
+    exportSourcesBtn.disabled = false;
+    renderVideoBtn.disabled = false;
+  } catch (err) {
+    // KHÔNG tự động render dữ liệu mẫu khi lỗi — chỉ hiện error state (xem PLAN.md mục 6)
+    showError(err.message || 'Không gọi được hệ thống, vui lòng thử lại.');
+  } finally {
+    loading.classList.remove('show');
+    runBtn.disabled = false;
+  }
+});
+
+exportScriptBtn.addEventListener('click', () => {
+  if (!AppState.kichBanJson) return;
+  const out = Object.assign({ schema: 'hackathon-kich-ban/1' }, AppState.kichBanJson);
+  downloadJSON(out, 'scriptscout-kich-ban.json');
+});
+exportSourcesBtn.addEventListener('click', () => {
+  if (!AppState.hoSoJson) return;
+  const out = Object.assign({ schema: 'hackathon-ho-so-nguon/1', ngayChay: new Date().toISOString() }, AppState.hoSoJson);
+  downloadJSON(out, 'scriptscout-ho-so-nguon.json');
+});
+
+renderVideoBtn.addEventListener('click', async () => {
+  if (!AppState.kichBanJson) return;
+  errorBox.style.display = 'none';
+  videoArea.style.display = 'none';
+  renderVideoBtn.disabled = true;
+  const originalText = renderVideoBtn.textContent;
+  renderVideoBtn.textContent = '🎬 Đang dựng video (TTS thật, ~30-60 giây)…';
+
+  const formData = new FormData();
+  formData.append('kich_ban_json', JSON.stringify(AppState.kichBanJson));
+
+  try {
+    const res = await fetch('/render-video', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    videoPlayer.src = URL.createObjectURL(blob);
+    videoArea.style.display = 'block';
+  } catch (err) {
+    showError(err.message || 'Không dựng được video, vui lòng thử lại.');
+  } finally {
+    renderVideoBtn.disabled = false;
+    renderVideoBtn.textContent = originalText;
+  }
+});
+
+// ---- Feature B: QA nội dung video so với kịch bản đã duyệt ----
+const qaContentSection = document.getElementById('qaContentSection');
+const qaContentRows = document.getElementById('qaContentRows');
+const qaContentResults = document.getElementById('qaContentResults');
+const qaContentCheckBtn = document.getElementById('qaContentCheckBtn');
+
+function renderQaContentRows() {
+  const cau = (AppState.kichBanJson && AppState.kichBanJson.cau) || [];
+  const withLoi = cau.filter(c => c.loi);
+  if (!withLoi.length) { qaContentSection.style.display = 'none'; return; }
+  qaContentSection.style.display = 'block';
+  qaContentResults.innerHTML = '';
+  qaContentRows.innerHTML = withLoi.map(c => `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; align-items:start;">
+      <div><label style="font-size:0.8em;color:#666;">Câu ${c.n} — đã duyệt</label>
+        <div style="padding:6px;background:#f5f5f5;border-radius:4px;">${escapeHtml(c.loi)}</div></div>
+      <div><label style="font-size:0.8em;color:#666;">Thử sửa thành câu SAI để test AI (giả định người đọc/video lỡ đọc thế này)</label>
+        <input type="text" class="qa-video-line" data-n="${c.n}" value="${escapeHtml(c.loi)}" style="width:100%;"></div>
+    </div>`).join('');
+}
+
+const NHAN_LABEL = { "khop": "✅ Khớp", "lech-nhe": "⚠️ Lệch nhẹ", "lech-noi-dung": "❌ LỆCH NỘI DUNG" };
+
+qaContentCheckBtn.addEventListener('click', async () => {
+  const pairs = Array.from(document.querySelectorAll('.qa-video-line')).map(input => {
+    const n = parseInt(input.dataset.n);
+    const cau = AppState.kichBanJson.cau.find(c => c.n === n);
+    return { n, loiGoc: cau.loi, loiTrongVideo: input.value };
+  });
+  qaContentResults.innerHTML = '<span class="spinner"></span> Đang so sánh…';
+  try {
+    const formData = new FormData();
+    formData.append('pairs_json', JSON.stringify(pairs));
+    const res = await fetch('/qa-content', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    qaContentResults.innerHTML = '<table style="width:100%;border-collapse:collapse;">' +
+      '<tr style="text-align:left;border-bottom:1px solid #ddd;"><th>Câu</th><th>Nhãn</th><th>Mức</th><th>Giải thích</th><th>Duyệt</th></tr>' +
+      data.ketQua.map(r => `<tr style="border-bottom:1px solid #eee;">
+        <td>${r.n}</td><td>${NHAN_LABEL[r.nhan] || r.nhan}</td><td>${escapeHtml(r.mucNghiemTrong)}</td>
+        <td>${escapeHtml(r.giaiThich)}</td>
+        <td>${r.nhan === 'khop' ? '' : '<label><input type="checkbox"> Accept</label> <label><input type="checkbox"> Reject</label>'}</td>
+      </tr>`).join('') + '</table>';
+  } catch (err) {
+    qaContentResults.innerHTML = '';
+    showError(err.message || 'Không kiểm tra được, vui lòng thử lại.');
+  }
+});
+
+// ---- Demo offline: bấm CHỦ ĐỘNG mới xem, không bao giờ tự động bật khi /generate lỗi ----
+const DEMO_FALLBACK = {
+  hoSo: {
+    nguon: [{ id: "s1", tieuDe: "Trang mẫu — AI, ML, Deep Learning, GenAI, LLM", toChuc: "Slide D1 (ví dụ demo offline)", ngayDang: "tài liệu nội bộ khoá", loai: "slide", doTinCay: "cao", lyDoTinCay: "Ví dụ cố định dùng khi mất mạng lúc demo." }],
+    thongTin: [{ id: "t1", noiDung: "Học máy là cách hệ thống học từ dữ liệu thay vì viết luật tay.", loai: "dinh-nghia",
+      bangChung: [{ nguonId: "s1", doanTrich: "Machine learning — học từ dữ liệu thay vì viết luật tay.", viTri: "trang 3" }] }]
+  },
+  kichBan: {
+    tieuDe: "Ví dụ demo offline", mucTieu: "Minh hoạ khi mất mạng lúc trình bày", phan: [{ so: 1, ten: "Ví dụ" }],
+    cau: [
+      { n: 1, phan: 1, kieu: "ke", loi: "Đây là dữ liệu mẫu cố định, dùng khi hệ thống thật không gọi được lúc demo trực tiếp.", chuTrenManHinh: "DEMO OFFLINE", yDoHinh: "Banner cảnh báo demo.", nguon: [] },
+      { n: 2, phan: 1, kieu: "giang", loi: "Học máy là cách hệ thống học từ dữ liệu thay vì được viết sẵn từng luật.", chuTrenManHinh: "Học máy — học từ dữ liệu", yDoHinh: "Minh hoạ khái niệm.", nguon: ["t1"] }
+    ]
+  }
+};
+
+demoBtn.addEventListener('click', () => {
+  resetViewBeforeRun();
+  AppState.isDemo = true;
+  AppState.hoSoJson = DEMO_FALLBACK.hoSo;
+  AppState.kichBanJson = DEMO_FALLBACK.kichBan;
+  const mapped = mapOfficialToInternal(DEMO_FALLBACK.hoSo, DEMO_FALLBACK.kichBan);
+  AppState.sources = mapped.sources;
+  AppState.sentences = mapped.sentences;
+
+  renderSources();
+  renderSentences();
+  renderQaContentRows();
+  results.classList.add('show');
+  demoBanner.style.display = 'block';
+  exportScriptBtn.disabled = false;
+  exportSourcesBtn.disabled = false;
+  renderVideoBtn.disabled = false;
+});
+</script>
+
+</body>
+</html>
