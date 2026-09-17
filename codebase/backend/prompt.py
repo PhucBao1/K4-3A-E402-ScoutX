@@ -165,3 +165,21 @@ PHẢI giữ đúng "n" như trong danh sách câu bị ảnh hưởng ở trên
 """
 
 REWRITE_RETRY_SUFFIX = "\n\nCHỈ trả về JSON hợp lệ theo đúng cấu trúc đã mô tả (nguonMoi, thongTinMoi, cauVietLai), không thêm bất kỳ chữ nào khác."
+
+JUDGE_RELEVANCE_PROMPT = """Bạn là người kiểm tra chất lượng trích dẫn, độc lập với AI đã viết kịch bản.
+Với mỗi cặp dưới đây, "doanTrich" được gắn làm bằng chứng cho "noiDung" — nhiệm vụ của bạn là chấm xem
+"doanTrich" CÓ THỰC SỰ xác nhận đúng nội dung cụ thể trong "noiDung" hay không. Chỉ cùng chủ đề chung
+chung KHÔNG đủ — nếu "noiDung" nói một mốc thời gian/con số/sự kiện cụ thể, "doanTrich" phải thực sự nói
+về đúng mốc/con số/sự kiện đó, không phải chỉ nói về chủ đề liên quan.
+
+Ví dụ KHÔNG liên quan (phải liệt kê): noiDung nói "ImageNet ra đời năm 2010", doanTrich nói về "AlexNet
+năm 2012" — hai sự kiện khác nhau, doanTrich không xác nhận được năm 2010.
+
+Danh sách cặp cần chấm (JSON, "index" là vị trí trong mảng bangChung của thongTin đó):
+{pairs_json}
+
+Trả về ĐÚNG JSON, không thêm chữ nào khác:
+{{"khongLienQuan": [{{"thongTinId": "...", "index": <số>}}, ...]}}
+Chỉ liệt kê cặp KHÔNG thực sự liên quan/không xác nhận đúng nội dung. Nếu tất cả đều liên quan thật, trả
+về {{"khongLienQuan": []}}.
+"""

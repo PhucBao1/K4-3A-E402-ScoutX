@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
 from prompt import (
+    JUDGE_RELEVANCE_PROMPT,
     PROMPT_TEMPLATE,
     RETRY_SUFFIX,
     REWRITE_PROMPT_TEMPLATE,
@@ -243,6 +244,60 @@ def validate_output(data: dict, source_text: str) -> None:
             raise ValueError(f"Câu {cau.get('n')} có chữ số trong 'loi' (phải viết bằng chữ): {loi!r}")
 
 
+def check_citation_relevance(data: dict) -> list[str]:
+    """Layer 7 — kiểm ngữ nghĩa: "doanTrich" tồn tại thật trong nguồn (Layer 4a) không có nghĩa nó
+    THỰC SỰ xác nhận đúng "noiDung" đang gắn vào. Phát hiện thật: khi 2 nguồn nói khác nhau về cùng
+    1 sự kiện (vd năm ImageNet ra đời), AI từng gắn thêm 2 trích dẫn CÓ THẬT nhưng nói chuyện khác
+    (AlexNet 2012, 1 câu tiếng Anh chung chung) làm "bằng chứng phụ" để tự nâng khống soNguonXacNhan
+    lên "da-xac-minh" — không lớp nào trước đó bắt được vì trích dẫn không bịa, chỉ là không liên
+    quan. Dùng 1 lượt AI riêng, độc lập, để chấm độ liên quan thật của từng cặp thongTin-bangChung."""
+    ho_so = data.get("hoSo", {})
+    pairs = []
+    for t in ho_so.get("thongTin", []):
+        for i, bc in enumerate(t.get("bangChung", [])):
+            pairs.append({
+                "thongTinId": t.get("id"), "noiDung": t.get("noiDung", ""),
+                "index": i, "doanTrich": bc.get("doanTrich", ""),
+            })
+    if not pairs:
+        return []
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": JUDGE_RELEVANCE_PROMPT.format(
+                pairs_json=json.dumps(pairs, ensure_ascii=False))}],
+            response_format={"type": "json_object"},
+        )
+        result = json.loads(resp.choices[0].message.content)
+    except Exception:
+        return []  # judge lỗi thì bỏ qua, không chặn luồng chính — tránh single point of failure
+
+    irrelevant = {(r.get("thongTinId"), r.get("index")) for r in result.get("khongLienQuan", [])}
+    if not irrelevant:
+        return []
+
+    problems = []
+    for t in ho_so.get("thongTin", []):
+        bc_list = t.get("bangChung", [])
+        remaining = {bc.get("nguonId") for i, bc in enumerate(bc_list) if (t.get("id"), i) not in irrelevant}
+        declared = t.get("soNguonXacNhan")
+        flagged = [i for i in range(len(bc_list)) if (t.get("id"), i) in irrelevant]
+        if not flagged:
+            continue
+        if declared is not None and declared > len(remaining):
+            problems.append(
+                f"thongTin {t.get('id')}: trích dẫn tại index {flagged} bị chấm KHÔNG thực sự liên quan "
+                f"tới nội dung '{t.get('noiDung', '')[:50]}...' nhưng vẫn tính vào soNguonXacNhan={declared}"
+            )
+        elif declared is None:
+            problems.append(
+                f"thongTin {t.get('id')}: trích dẫn tại index {flagged} không thực sự liên quan tới nội "
+                f"dung '{t.get('noiDung', '')[:50]}...'"
+            )
+    return problems
+
+
 @app.post("/generate")
 async def generate(
     topic: str = Form(...),
@@ -278,6 +333,9 @@ async def generate(
         try:
             data = call_openai(attempt_prompt, images_b64)
             validate_output(data, all_source_text)
+            relevance_problems = check_citation_relevance(data)
+            if relevance_problems:
+                raise ValueError(f"Trích dẫn không thực sự liên quan tới nội dung: {relevance_problems}")
             return data
         except (json.JSONDecodeError, ValueError) as e:
             last_error = e
@@ -336,6 +394,9 @@ async def add_source(
         try:
             data = call_openai(attempt_prompt, images_b64)
             validate_output(data, all_source_text)
+            relevance_problems = check_citation_relevance(data)
+            if relevance_problems:
+                raise ValueError(f"Trích dẫn không thực sự liên quan tới nội dung: {relevance_problems}")
             return data
         except (json.JSONDecodeError, ValueError) as e:
             last_error = e
@@ -426,7 +487,11 @@ async def rewrite(
             new_kich_ban = dict(kich_ban)
             new_kich_ban["cau"] = [cau_by_n[n] for n in sorted(cau_by_n)]
 
-            validate_output({"hoSo": new_ho_so, "kichBan": new_kich_ban}, all_source_text)
+            merged_data = {"hoSo": new_ho_so, "kichBan": new_kich_ban}
+            validate_output(merged_data, all_source_text)
+            relevance_problems = check_citation_relevance(merged_data)
+            if relevance_problems:
+                raise ValueError(f"Trích dẫn không thực sự liên quan tới nội dung: {relevance_problems}")
             return {"hoSo": new_ho_so, "kichBan": new_kich_ban, "rewrittenNs": sorted(affected_ns)}
         except (json.JSONDecodeError, ValueError, KeyError) as e:
             last_error = e
