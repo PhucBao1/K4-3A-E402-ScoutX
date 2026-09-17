@@ -3,6 +3,7 @@ import json
 import os
 import re
 import tempfile
+from datetime import datetime
 
 import pymupdf as fitz  # PyMuPDF
 from dotenv import load_dotenv
@@ -421,6 +422,7 @@ async def generate(
     prompt_text = PROMPT_TEMPLATE.format(
         topic=topic, goal=goal, audience=audience, duration=duration,
         target_sentences=estimate_target_sentences(duration),
+        thoi_diem_hien_tai=datetime.now().astimezone().isoformat(timespec="seconds"),
         slide_text=source_text or "(người dùng không upload slide — dùng nguồn mạng làm nguồn chính)",
         web_text=web_text or "(không tìm được nguồn ngoài, chỉ dùng slide)",
     )
@@ -482,6 +484,7 @@ async def add_source(
     prompt_text = PROMPT_TEMPLATE.format(
         topic=topic, goal=goal, audience=audience, duration=duration,
         target_sentences=estimate_target_sentences(duration),
+        thoi_diem_hien_tai=datetime.now().astimezone().isoformat(timespec="seconds"),
         slide_text=source_text or "(người dùng không upload slide — dùng nguồn mạng làm nguồn chính)",
         web_text=web_text_combined,
     ) + (

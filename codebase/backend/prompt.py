@@ -50,6 +50,13 @@ học" nếu từ slide, hoặc tên tác giả/tổ chức thật nếu từ m�
 trống/null nếu là slide), loai ("slide" hoặc "web"), doTinCay ("cao"/"trung-binh"/"thap"), lyDoTinCay (với
 nguồn mạng: đánh giá dựa trên tác giả có rõ ràng không, có ngày công bố không, có được nguồn khác xác nhận
 không — không chỉ vì "tìm thấy trên mạng" là tự động tin được).
+Thêm 2 trường vào MỖI "nguon":
+- "ngayLayVe": LUÔN dùng đúng giá trị "{thoi_diem_hien_tai}" (thời điểm thật hiện tại, không tự đoán/bịa
+  ngày khác) cho mọi nguồn, kể cả slide.
+- "canhBao": (tuỳ chọn, CHỈ thêm nếu thật sự có lý do) mảng các câu cảnh báo ngắn nếu "ngayDang" của nguồn
+  đã khá cũ so với tốc độ thay đổi của chủ đề (đặc biệt chủ đề về giá/chi phí model AI, phiên bản phần
+  mềm, số liệu thị trường — những thứ đổi theo tháng) — ví dụ: "Số liệu năm 2023, có thể đã lỗi thời với
+  chủ đề đổi nhanh này, nên đối chiếu thêm trước khi dùng." Không thêm nếu không có lý do thật.
 Với mỗi thông tin trích ra, ghi vào mảng "thongTin" của "hoSo": mỗi thông tin có id (chuỗi ngắn tự đặt, duy
 nhất), noiDung, loai, và mảng "bangChung" gồm các {{"nguonId": <đúng id trong "nguon" ở trên>, "doanTrich":
 <trích NGUYÊN VĂN, chính xác từng chữ từ đúng khối TEXT tương ứng ở trên>, "viTri": <vị trí, ví dụ "trang
