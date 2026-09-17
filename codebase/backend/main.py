@@ -15,6 +15,7 @@ from openai import OpenAI
 from render_video import render as render_video_to_mp4
 
 from prompt import (
+    EXPAND_SCRIPT_PROMPT,
     JUDGE_RELEVANCE_PROMPT,
     PROMPT_TEMPLATE,
     QA_CONTENT_FROM_TRANSCRIPT_PROMPT,
@@ -347,6 +348,48 @@ def check_content_conformance(pairs: list[dict]) -> list[dict]:
     }) for p in pairs]
 
 
+def expand_script_with_analogy(kich_ban: dict) -> dict:
+    """Lượt AI THỨ HAI, tách riêng khỏi sinh nội dung chính — chỉ chèn thêm câu diễn giải/ví dụ
+    minh hoạ (nguon: []) để kéo dài kịch bản theo phong cách 3Blue1Brown, không đụng câu gốc đã
+    validate xong ở lượt 1. An toàn tuyệt đối: lỗi bất kỳ đâu (API lỗi, AI sửa câu gốc, câu mới vi
+    phạm luật) đều TỰ ĐỘNG rớt về kịch bản gốc — không bao giờ làm hỏng kết quả chính. Tách làm 2
+    lượt vì nhồi việc "kéo dài" vào chung 1 prompt với việc "trích dẫn đúng" đã thử 2 lần đều thất
+    bại (AI bắt đầu bịa/gắn sai nguồn để đủ dài) — xem eval/golden-set.md case 24."""
+    original_cau = kich_ban.get("cau", [])
+    if not original_cau:
+        return kich_ban
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": EXPAND_SCRIPT_PROMPT.format(
+                kich_ban_json=json.dumps(original_cau, ensure_ascii=False))}],
+            response_format={"type": "json_object"},
+        )
+        parsed = json.loads(resp.choices[0].message.content)
+        expanded_cau = parsed.get("cauMoRong", [])
+
+        # Guard 1: mọi câu gốc phải còn nguyên văn (so theo "loi") — không câu nào bị sửa/mất
+        original_loi_set = {c.get("loi") for c in original_cau if c.get("loi")}
+        expanded_loi_set = {c.get("loi") for c in expanded_cau if c.get("loi")}
+        if not original_loi_set.issubset(expanded_loi_set):
+            return kich_ban
+
+        # Guard 2: câu MỚI (không có trong bản gốc) phải "nguon": [] và không chữ số trong "loi"
+        for c in expanded_cau:
+            if c.get("loi") not in original_loi_set:
+                if _as_list(c.get("nguon")):
+                    return kich_ban
+                if c.get("loi") and re.search(r"\d", c["loi"]):
+                    return kich_ban
+
+        new_kich_ban = dict(kich_ban)
+        new_kich_ban["cau"] = expanded_cau
+        return new_kich_ban
+    except Exception:
+        return kich_ban
+
+
 @app.post("/qa-content")
 async def qa_content_endpoint(pairs_json: str = Form(...)):
     """pairs_json: JSON list [{"n": 1, "loiGoc": "...", "loiTrongVideo": "..."}, ...]"""
@@ -638,6 +681,17 @@ async def render_video_endpoint(kich_ban_json: str = Form(...)):
         os.remove(out_path)
         raise HTTPException(status_code=502, detail=f"Dựng video lỗi: {e}")
     return FileResponse(out_path, media_type="video/mp4", filename="scriptscout-video.mp4")
+
+
+@app.post("/expand-script")
+async def expand_script_endpoint(kich_ban_json: str = Form(...)):
+    """Nút riêng, KHÔNG chạy tự động trong /generate — xem expand_script_with_analogy(). Trả về
+    kịch bản gốc y hệt nếu lượt mở rộng lỗi/vi phạm luật, kèm cờ "daMoRong" để UI biết có đổi gì
+    thật không (tránh báo "đã mở rộng" giả khi thực ra bị rớt về bản gốc)."""
+    kich_ban = json.loads(kich_ban_json)
+    expanded = expand_script_with_analogy(kich_ban)
+    da_mo_rong = len(expanded.get("cau", [])) > len(kich_ban.get("cau", []))
+    return {"kichBan": expanded, "daMoRong": da_mo_rong}
 
 
 # Static files (frontend) — MOUNT SAU CÙNG, sau mọi route API, để không nuốt mất /generate

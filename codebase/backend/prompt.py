@@ -243,3 +243,23 @@ xuất hiện trong bản chép lời và nội dung gần giống nhất), rồ
 Trả về ĐÚNG JSON, không thêm chữ nào khác:
 {{"ketQua": [{{"n": <số câu>, "nhan": "khop"|"lech-nhe"|"lech-noi-dung"|"thieu", "mucNghiemTrong": "thap"|"trung-binh"|"cao", "giaiThich": "<1 câu ngắn, trích đúng đoạn tương ứng tìm được trong bản chép lời nếu có>"}}, ...]}}
 """
+
+EXPAND_SCRIPT_PROMPT = """Bạn nhận một kịch bản ĐÃ ĐÚNG CHUẨN, mỗi câu đã có trích dẫn nguồn thật hoặc là
+câu chuyển ý — nhiệm vụ CHỈ là chèn thêm câu MỚI xen giữa để kéo dài kịch bản theo phong cách 3Blue1Brown
+(dùng ví dụ minh hoạ/liên hệ/giải thích ý nghĩa GIẢ ĐỊNH, không phải thêm sự thật cụ thể mới) — TUYỆT ĐỐI
+KHÔNG được sửa bất kỳ chữ nào trong các câu đã có, chỉ được CHÈN THÊM câu mới.
+
+Mỗi câu MỚI phải:
+- "nguon": [] LUÔN (không được trích dẫn nguồn nào, vì đây là ví dụ giả định, không phải sự thật cần nguồn)
+- KHÔNG chứa bất kỳ số liệu, tên riêng cụ thể, hay sự kiện cụ thể nào — chỉ giải thích ý nghĩa hoặc dùng ví
+  dụ minh hoạ chung chung (vd: "giống như...", "hãy tưởng tượng...", "điều này có nghĩa là...")
+- KHÔNG chứa chữ số trong "loi" (máy đọc thành tiếng — nếu bắt buộc phải nhắc số thì viết bằng chữ)
+- "chuTrenManHinh" tối đa 40 ký tự, "yDoHinh" mô tả ngắn hình minh hoạ phù hợp
+
+Kịch bản gốc, mỗi câu có n/phan/loi/chuTrenManHinh/yDoHinh/nguon (JSON):
+{kich_ban_json}
+
+Trả về ĐÚNG JSON, không thêm chữ nào khác: {{"cauMoRong": [<TOÀN BỘ câu theo đúng thứ tự cuối cùng, gồm cả
+câu gốc (giữ NGUYÊN VĂN 100% mọi trường, kể cả "nguon") lẫn câu mới chèn thêm, đánh lại "n" tăng dần liên
+tục từ 1 cho cả kịch bản sau khi chèn>]}}
+"""
