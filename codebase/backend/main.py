@@ -2,12 +2,16 @@ import base64
 import json
 import os
 import re
+import tempfile
 
 import pymupdf as fitz  # PyMuPDF
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
+
+from render_video import render as render_video_to_mp4
 
 from prompt import (
     JUDGE_RELEVANCE_PROMPT,
@@ -508,6 +512,23 @@ async def rewrite(
             continue
 
     raise HTTPException(status_code=502, detail=f"AI_INVALID_JSON: {last_error}")
+
+
+@app.post("/render-video")
+async def render_video_endpoint(kich_ban_json: str = Form(...)):
+    """Bonus "NÂNG CAO" tích hợp thẳng vào web — xem render_video.py. Chạy đồng bộ (chặn tiến
+    trình lúc TTS+ffmpeg), chấp nhận được cho demo hackathon 1 người dùng, không phải production."""
+    kich_ban = json.loads(kich_ban_json)
+    if not kich_ban.get("cau"):
+        raise HTTPException(status_code=400, detail="Kịch bản trống, không có gì để dựng video")
+    fd, out_path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    try:
+        render_video_to_mp4(kich_ban, out_path)
+    except Exception as e:
+        os.remove(out_path)
+        raise HTTPException(status_code=502, detail=f"Dựng video lỗi: {e}")
+    return FileResponse(out_path, media_type="video/mp4", filename="scriptscout-video.mp4")
 
 
 # Static files (frontend) — MOUNT SAU CÙNG, sau mọi route API, để không nuốt mất /generate

@@ -265,8 +265,13 @@
     <p class="empty-hint" id="clickHint">👆 Bấm vào một câu hoặc một nguồn bất kỳ để xem đúng chỗ chứng minh cho nó.</p>
 
     <div class="export-row">
-      <button class="secondary" id="exportScriptBtn" disabled>⬇️ Xuất kịch bản (.json) — để dựng video</button>
+      <button class="secondary" id="exportScriptBtn" disabled>⬇️ Xuất kịch bản (.json)</button>
       <button class="secondary" id="exportSourcesBtn" disabled>⬇️ Xuất hồ sơ tài liệu (.json)</button>
+      <button class="primary" id="renderVideoBtn" disabled>🎬 Dựng video (bonus, tốn ~30-60 giây)</button>
+    </div>
+    <div id="videoArea" style="display:none; margin-top:10px;">
+      <video id="videoPlayer" controls style="max-width:100%; border-radius:6px;"></video>
+      <p style="font-size:0.85em;color:#666;">Video dựng từ TTS thật, khung hình tĩnh — không phải animation. Xem <code>codebase/backend/README.md</code> để biết giới hạn.</p>
     </div>
 
     <div id="proof">
@@ -391,6 +396,9 @@ const proofSourceName = document.getElementById('proofSourceName');
 const clickHint = document.getElementById('clickHint');
 const exportScriptBtn = document.getElementById('exportScriptBtn');
 const exportSourcesBtn = document.getElementById('exportSourcesBtn');
+const renderVideoBtn = document.getElementById('renderVideoBtn');
+const videoArea = document.getElementById('videoArea');
+const videoPlayer = document.getElementById('videoPlayer');
 
 function confClass(doTinCay) { return "conf-" + String(doTinCay).replace(/\s+/g, "-"); }
 
@@ -587,6 +595,8 @@ runBtn.addEventListener('click', async () => {
   runBtn.disabled = true;
   exportScriptBtn.disabled = true;
   exportSourcesBtn.disabled = true;
+  renderVideoBtn.disabled = true;
+  videoArea.style.display = 'none';
 
   const formData = new FormData();
   if (fileInput.files.length) formData.append('file', fileInput.files[0]);
@@ -613,6 +623,7 @@ runBtn.addEventListener('click', async () => {
     results.classList.add('show');
     exportScriptBtn.disabled = false;
     exportSourcesBtn.disabled = false;
+    renderVideoBtn.disabled = false;
   } catch (err) {
     // KHÔNG tự động render dữ liệu mẫu khi lỗi — chỉ hiện error state (xem PLAN.md mục 6)
     showError(err.message || 'Không gọi được hệ thống, vui lòng thử lại.');
@@ -631,6 +642,34 @@ exportSourcesBtn.addEventListener('click', () => {
   if (!AppState.hoSoJson) return;
   const out = Object.assign({ schema: 'hackathon-ho-so-nguon/1', ngayChay: new Date().toISOString() }, AppState.hoSoJson);
   downloadJSON(out, 'scriptscout-ho-so-nguon.json');
+});
+
+renderVideoBtn.addEventListener('click', async () => {
+  if (!AppState.kichBanJson) return;
+  errorBox.style.display = 'none';
+  videoArea.style.display = 'none';
+  renderVideoBtn.disabled = true;
+  const originalText = renderVideoBtn.textContent;
+  renderVideoBtn.textContent = '🎬 Đang dựng video (TTS thật, ~30-60 giây)…';
+
+  const formData = new FormData();
+  formData.append('kich_ban_json', JSON.stringify(AppState.kichBanJson));
+
+  try {
+    const res = await fetch('/render-video', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    videoPlayer.src = URL.createObjectURL(blob);
+    videoArea.style.display = 'block';
+  } catch (err) {
+    showError(err.message || 'Không dựng được video, vui lòng thử lại.');
+  } finally {
+    renderVideoBtn.disabled = false;
+    renderVideoBtn.textContent = originalText;
+  }
 });
 
 // ---- Demo offline: bấm CHỦ ĐỘNG mới xem, không bao giờ tự động bật khi /generate lỗi ----
@@ -664,6 +703,7 @@ demoBtn.addEventListener('click', () => {
   demoBanner.style.display = 'block';
   exportScriptBtn.disabled = false;
   exportSourcesBtn.disabled = false;
+  renderVideoBtn.disabled = false;
 });
 </script>
 
