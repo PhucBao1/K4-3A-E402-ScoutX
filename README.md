@@ -8,9 +8,9 @@
 
 | Họ và Tên | Mã Học Viên | Vai trò chính | Phần việc đảm nhiệm trong dự án |
 |---|---|---|---|
-| Nguyễn Phúc Bảo (đội trưởng) | 2A202602925 | Build flow + Prompt/Golden set | Thiết kế & code backend FastAPI + OpenAI gpt-4o-mini (`codebase/backend/main.py`): trích PDF (text + ảnh), gọi AI sinh kịch bản, tích hợp web search (OpenAI Responses API) khi slide thiếu nguồn, endpoint `/rewrite` xoá nguồn → viết lại câu bị ảnh hưởng. Viết prompt (`prompt.py`) và 5 lớp validate chống bịa số liệu/trích dẫn sai. Xây & chạy bộ golden set 20 case thật (`eval/golden-set.md`), phân tích nguyên nhân 4 case chưa đạt. |
-| Nguyễn Việt Dũng | 2A202602533 | Evidence + Spec/Validation | Phỏng vấn thật ≥3 người (lab coach/Studio team) theo Mom Test, ghi log nguyên văn vào `eval/interview-guide.md`. Cùng viết `spec.md`: phần bằng chứng (§1-§2) dựa trên nội dung phỏng vấn thu được. Chuẩn bị nhật ký `validation/` cho CP5 (5 người ngoài dùng thử). |
-| Nguyễn Văn Biển | 2A202602416 | Evidence + Spec/Validation | Cùng đi phỏng vấn thật ≥3 người (lab coach/Studio team), đối chiếu log với Dũng. Viết phần `spec.md` §3 (dùng thử thật ≥1 sản phẩm tương tự, ghi nhận xét so sánh) và §8 (phân công). Hỗ trợ chuẩn bị `validation/` cùng Dũng. |
+| Nguyễn Phúc Bảo (đội trưởng) | 2A202602925 | Build flow + Prompt/Golden set | Thiết kế & code backend FastAPI + OpenAI gpt-4o-mini (`codebase/backend/main.py`): trích PDF (text + ảnh), gọi AI sinh kịch bản, tích hợp web search (OpenAI Responses API) khi slide thiếu nguồn, endpoint `/rewrite` xoá nguồn → viết lại câu bị ảnh hưởng. Viết prompt (`prompt.py`) và 7 lớp validate chống bịa số liệu/trích dẫn sai. Xây & chạy bộ golden set 20+ case thật (`eval/golden-set.md`), phân tích nguyên nhân các case chưa đạt. |
+| Nguyễn Việt Dũng | 2A202602533 | Evidence + Spec/Validation | Phỏng vấn thật các Lab Coach kiêm Studio team theo Mom Test, ghi log nguyên văn vào `eval/interview-guide.md`. Cùng viết `spec.md`: phần bằng chứng (§1-§2) dựa trên nội dung phỏng vấn thu được. Chuẩn bị nhật ký `validation/` cho CP5 (5 người ngoài dùng thử). |
+| Nguyễn Văn Biển | 2A202602416 | Evidence + Spec/Validation | Cùng đi phỏng vấn các Lab Coach kiêm Studio team, đối chiếu log với Dũng. Viết phần `spec.md` §3 (dùng thử thật ≥1 sản phẩm tương tự, ghi nhận xét so sánh) và §8 (phân công). Hỗ trợ chuẩn bị `validation/` cùng Dũng. |
 
 > Nhóm copy nguyên file README này về repo của mình, rồi điền bảng trên. Cột **Phần việc đảm nhiệm** ghi càng cụ thể càng tốt.
 
