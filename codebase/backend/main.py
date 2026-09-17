@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import re
+import shutil
 import tempfile
 from datetime import datetime
 
@@ -12,6 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
+from format_qa import check_video_format
 from render_video import render as render_video_to_mp4
 
 from prompt import (
@@ -586,6 +588,75 @@ async def qa_content_from_audio_endpoint(
     transcript_text = transcribe_audio(audio_bytes, file.filename or "audio.mp4")
     results = check_content_conformance_from_transcript(kich_ban.get("cau", []), transcript_text)
     return {"ketQua": results, "transcript": transcript_text}
+
+
+def _save_upload_to_tmp(video_bytes: bytes, filename: str) -> str:
+    fd, path = tempfile.mkstemp(suffix=os.path.splitext(filename or "video.mp4")[1] or ".mp4")
+    os.close(fd)
+    with open(path, "wb") as f:
+        f.write(video_bytes)
+    return path
+
+
+def _run_format_check(video_path: str) -> dict:
+    """Chạy Feature A rồi đính base64 cho từng ảnh frame vi phạm (để UI hiện trực tiếp, không
+    cần đường dẫn file cục bộ), dọn thư mục frame tạm sau khi xong."""
+    result = check_video_format(video_path)
+    seen: dict[str, str] = {}
+    for v in result["viPham"]:
+        frame_path = v.pop("anhFrame")
+        if frame_path not in seen:
+            with open(frame_path, "rb") as f:
+                seen[frame_path] = base64.b64encode(f.read()).decode()
+        v["anhFrameBase64"] = seen[frame_path]
+    shutil.rmtree(result.pop("thuMucFrame"), ignore_errors=True)
+    return result
+
+
+@app.post("/format-check")
+async def format_check_endpoint(file: UploadFile = File(...)):
+    """Feature A — Video Format Compliance Checker (BA.md mục 5, CHƯA build trước hôm nay).
+    Thuần rule-based + OCR (format_qa.py) — KHÔNG gọi AI cho bước so sánh, đúng chuẩn khung-hinh.md
+    của BTC (1920x1080/30fps/chữ tối đa 40 ký tự/vùng an toàn)."""
+    video_bytes = await file.read()
+    video_path = _save_upload_to_tmp(video_bytes, file.filename or "video.mp4")
+    try:
+        return _run_format_check(video_path)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        os.remove(video_path)
+
+
+@app.post("/qa-full")
+async def qa_full_endpoint(
+    kich_ban_json: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """Gộp Feature A (format) + Feature B (nội dung) chạy trên CÙNG 1 file video đã dựng, trả 1
+    báo cáo duy nhất — 2 việc độc lập nhau (A thuần rule-based+OCR, B dùng Whisper+AI so ngữ
+    nghĩa), chỉ gộp chung điểm vào/ra cho tiện người QA dùng 1 lần thay vì gọi 2 API riêng."""
+    kich_ban = json.loads(kich_ban_json)
+    video_bytes = await file.read()
+    video_path = _save_upload_to_tmp(video_bytes, file.filename or "video.mp4")
+    try:
+        try:
+            dinhDangKetQua = _run_format_check(video_path)
+        except RuntimeError as e:
+            dinhDangKetQua = {"dat": False, "loi": str(e)}
+
+        with open(video_path, "rb") as f:
+            transcript_text = transcribe_audio(f.read(), file.filename or "video.mp4")
+        noiDungKetQua = check_content_conformance_from_transcript(
+            kich_ban.get("cau", []), transcript_text,
+        )
+    finally:
+        os.remove(video_path)
+
+    return {
+        "dinhDang": dinhDangKetQua,
+        "noiDung": {"ketQua": noiDungKetQua, "transcript": transcript_text},
+    }
 
 
 @app.post("/generate")
