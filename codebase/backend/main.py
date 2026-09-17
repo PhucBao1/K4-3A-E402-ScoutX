@@ -286,6 +286,64 @@ async def generate(
     raise HTTPException(status_code=502, detail=f"AI_INVALID_JSON: {last_error}")
 
 
+@app.post("/add-source")
+async def add_source(
+    topic: str = Form(...),
+    goal: str = Form(...),
+    audience: str = Form(...),
+    duration: int = Form(...),
+    source_url: str = Form(...),
+    source_title: str = Form(...),
+    source_excerpt: str = Form(...),
+    source_org: str = Form(""),
+    source_date: str = Form(""),
+    file: UploadFile | None = File(None),
+):
+    """Đúng "Sản phẩm tối thiểu" C3: màn hình duyệt nguồn phải cho "thêm nguồn của mình". Người dùng
+    tự dán URL + đoạn trích (không tự động cào trang — không có tầng fetch riêng), AI viết lại kịch
+    bản với nguồn này được ép buộc đưa vào cùng slide/web như một nguồn thật, qua lại đúng validate
+    đã test kỹ ở /generate thay vì viết logic vá riêng rủi ro hơn."""
+    if file is not None:
+        pdf_bytes = await file.read()
+        doc = load_pdf(pdf_bytes)
+        source_text = extract_pdf_text(doc)
+        images_b64 = pdf_to_images_base64(doc)
+    else:
+        source_text = ""
+        images_b64 = []
+    web_text = search_web_sources(f"{topic}. {goal}")
+    user_source_block = (
+        "\n\n--- NGUỒN NGƯỜI DÙNG TỰ THÊM (coi như 1 nguồn web bình thường) ---\n"
+        f"URL: {source_url}\nTiêu đề: {source_title}\nTác giả/Tổ chức: {source_org or 'không rõ'}\n"
+        f"Ngày đăng: {source_date or 'không rõ'}\n"
+        f"Trích dẫn: {source_excerpt}\n--- HẾT NGUỒN NGƯỜI DÙNG TỰ THÊM ---"
+    )
+    web_text_combined = (web_text or "") + user_source_block
+    all_source_text = source_text + "\n\n" + web_text_combined
+
+    prompt_text = PROMPT_TEMPLATE.format(
+        topic=topic, goal=goal, audience=audience, duration=duration,
+        slide_text=source_text or "(người dùng không upload slide — dùng nguồn mạng làm nguồn chính)",
+        web_text=web_text_combined,
+    ) + (
+        "\n\nLƯU Ý: khối NGUỒN TÌM ĐƯỢC TRÊN MẠNG có 1 đoạn đánh dấu '--- NGUỒN NGƯỜI DÙNG TỰ THÊM ---' — "
+        "đây là nguồn người dùng tự cung cấp, hãy coi như một nguồn web bình thường và dùng nếu liên quan "
+        "tới chủ đề, không được bỏ qua chỉ vì nó không do bạn tự tìm."
+    )
+
+    last_error = None
+    for attempt_prompt in (prompt_text, prompt_text + RETRY_SUFFIX, prompt_text + RETRY_SUFFIX):
+        try:
+            data = call_openai(attempt_prompt, images_b64)
+            validate_output(data, all_source_text)
+            return data
+        except (json.JSONDecodeError, ValueError) as e:
+            last_error = e
+            continue
+
+    raise HTTPException(status_code=502, detail=f"AI_INVALID_JSON: {last_error}")
+
+
 @app.post("/rewrite")
 async def rewrite(
     topic: str = Form(...),

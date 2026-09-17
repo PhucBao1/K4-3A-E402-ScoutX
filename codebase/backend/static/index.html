@@ -192,6 +192,9 @@
 <div class="banner warn">
   ℹ️ AI tự tìm 2-3 nguồn trên mạng theo chủ đề và chấm độ tin cậy từng nguồn; nếu có upload slide, AI đọc thêm slide làm nguồn bổ sung. Bấm "Loại nguồn này" trên 1 nguồn để yêu cầu AI viết lại đúng những câu phụ thuộc vào nguồn đó — các câu khác giữ nguyên.
 </div>
+<div class="banner warn">
+  ⚠️ Kịch bản do AI viết ra ĐÂY LÀ BẢN NHÁP — giảng viên/người duyệt phải xem lại và duyệt nội dung trước khi dùng để dựng thành video thật.
+</div>
 
 <main>
   <div class="card">
@@ -232,6 +235,30 @@
   <div class="card" id="results">
     <h3 style="margin-top:0;">Hồ sơ tài liệu</h3>
     <div id="sourcesArea"></div>
+
+    <button class="ghost" id="showAddSourceBtn" type="button" style="margin-top:8px;">+ Thêm nguồn của bạn</button>
+    <div id="addSourceForm" style="display:none; margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+      <label for="addSourceUrl">URL nguồn</label>
+      <input id="addSourceUrl" placeholder="https://...">
+      <label for="addSourceTitle">Tiêu đề</label>
+      <input id="addSourceTitle" placeholder="Tên bài viết/tài liệu">
+      <div class="row">
+        <div>
+          <label for="addSourceOrg">Tác giả/Tổ chức (nếu biết)</label>
+          <input id="addSourceOrg" placeholder="VD: Bộ Khoa học Công nghệ">
+        </div>
+        <div>
+          <label for="addSourceDate">Ngày đăng (nếu biết)</label>
+          <input id="addSourceDate" placeholder="VD: 2025-03-01">
+        </div>
+      </div>
+      <label for="addSourceExcerpt">Đoạn trích bạn muốn dùng làm bằng chứng</label>
+      <input id="addSourceExcerpt" placeholder="Dán nguyên văn đoạn quan trọng nhất từ trang đó">
+      <div class="actions-row">
+        <button class="primary" id="submitAddSourceBtn" type="button">Thêm và viết lại kịch bản</button>
+        <button class="ghost" id="cancelAddSourceBtn" type="button">Huỷ</button>
+      </div>
+    </div>
 
     <h3>Kịch bản</h3>
     <div id="sentenceList"></div>
@@ -341,6 +368,16 @@ function downloadJSON(obj, filename) {
 
 const runBtn = document.getElementById('runBtn');
 const demoBtn = document.getElementById('demoBtn');
+const showAddSourceBtn = document.getElementById('showAddSourceBtn');
+const cancelAddSourceBtn = document.getElementById('cancelAddSourceBtn');
+const submitAddSourceBtn = document.getElementById('submitAddSourceBtn');
+showAddSourceBtn.addEventListener('click', () => {
+  document.getElementById('addSourceForm').style.display = 'block';
+});
+cancelAddSourceBtn.addEventListener('click', () => {
+  document.getElementById('addSourceForm').style.display = 'none';
+});
+submitAddSourceBtn.addEventListener('click', addSourceAndRegenerate);
 const loading = document.getElementById('loading');
 const errorBox = document.getElementById('errorBox');
 const demoBanner = document.getElementById('demoBanner');
@@ -473,6 +510,57 @@ async function removeSourceAndRewrite(sourceId) {
     clickHint.style.display = 'block';
   } catch (err) {
     showError(err.message || 'Không viết lại được, vui lòng thử lại.');
+  } finally {
+    loading.classList.remove('show');
+    loading.innerHTML = '<span class="spinner"></span>Đang tìm nguồn và viết kịch bản…';
+  }
+}
+
+async function addSourceAndRegenerate() {
+  const url = document.getElementById('addSourceUrl').value.trim();
+  const title = document.getElementById('addSourceTitle').value.trim();
+  const excerpt = document.getElementById('addSourceExcerpt').value.trim();
+  if (!url || !title || !excerpt) {
+    showError('Cần nhập đủ URL, tiêu đề và đoạn trích để thêm nguồn.');
+    return;
+  }
+  const fileInput = document.getElementById('slideFile');
+  errorBox.style.display = 'none';
+  loading.innerHTML = '<span class="spinner"></span>Đang thêm nguồn và viết lại kịch bản…';
+  loading.classList.add('show');
+
+  const formData = new FormData();
+  if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+  formData.append('topic', document.getElementById('topic').value);
+  formData.append('goal', document.getElementById('goal').value);
+  formData.append('audience', document.getElementById('audience').value);
+  formData.append('duration', document.getElementById('duration').value);
+  formData.append('source_url', url);
+  formData.append('source_title', title);
+  formData.append('source_excerpt', excerpt);
+  formData.append('source_org', document.getElementById('addSourceOrg').value);
+  formData.append('source_date', document.getElementById('addSourceDate').value);
+
+  try {
+    const res = await fetch('/add-source', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    AppState.hoSoJson = data.hoSo;
+    AppState.kichBanJson = data.kichBan;
+    const mapped = mapOfficialToInternal(data.hoSo, data.kichBan);
+    AppState.sources = mapped.sources;
+    AppState.sentences = mapped.sentences;
+
+    renderSources();
+    renderSentences();
+    document.getElementById('addSourceForm').style.display = 'none';
+    ['addSourceUrl', 'addSourceTitle', 'addSourceOrg', 'addSourceDate', 'addSourceExcerpt']
+      .forEach(id => { document.getElementById(id).value = ''; });
+  } catch (err) {
+    showError(err.message || 'Không thêm được nguồn, vui lòng thử lại.');
   } finally {
     loading.classList.remove('show');
     loading.innerHTML = '<span class="spinner"></span>Đang tìm nguồn và viết kịch bản…';
