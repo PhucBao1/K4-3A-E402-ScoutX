@@ -403,3 +403,52 @@ chính). Giữ nguyên Structured Outputs + toàn bộ guard.
 hạn năng lực gpt-4o-mini khi phải vừa tái tạo verbatim vừa sáng tạo nội dung mới trong 1 lượt gọi dài. Đổi
 sang model thế hệ mới hơn cho riêng bước này giải quyết được phần lớn (không phải 100%, nhưng từ "thường
 thất bại" → "thường đạt gần target"). Khuyến nghị: áp dụng model này làm mặc định cho `/expand-script-full`.
+
+## Case 34 — video HyperFrames "lỗi nhiều": chẩn đoán đúng nguyên nhân trước khi sửa (bonus, sau CP4)
+
+Người dùng phản hồi video full-pipeline (32 câu, 268s) "lỗi nhiều". Trích 9 khung hình rải đều để xem trực
+tiếp (không đoán) — tìm được đúng 2 bug thật:
+- **Tràn lề phải**: dãy "Dấu mốc 4/5" chạy ra ngoài mép 1920px vì AI vẽ đủ số lượng mốc thực tế mà không
+  tính lại khoảng cách theo số lượng.
+- **Chữ bị đường kẻ cắt ngang**: nhãn "Chi tiết 1/2/3" bị 1 đường kẻ đi ngang qua giữa dòng chữ.
+Cộng thêm các điểm yếu bố cục (không phải bug): cảnh fallback nhạt khi AI thất bại 3 lần, sơ đồ đúng nội
+dung nhưng nhỏ/lệch góc để trống nhiều khoảng canvas.
+
+**Trước khi sửa, làm đúng yêu cầu "xác định đúng vấn đề, search giúp trước khi làm"**: so sánh với 1 video
+mẫu (`transformer_explainer.mp4`, xác nhận qua metadata `hyperframes_renderer=hyperframes` là render bằng
+đúng CLI này nhưng KHÔNG qua pipeline của mình) và đọc guide chính thức của HyperFrames
+(hyperframes.heygen.com/guides/prompting, github.com/heygen-com/hyperframes/blob/main/docs/guides/claude-design-hyperframes.md).
+Xác nhận nguyên nhân KHÔNG phải do model yếu (không có bằng chứng rõ ràng gpt-4o-mini kém hơn hẳn cho việc
+này) mà do **thiếu 2 lớp kiến trúc/prompt cụ thể mà guide gốc nêu rõ**: (1) không có "khung thương hiệu cố
+định" (header/caption) dùng chung mọi cảnh — mỗi cảnh AI tự bịa lại từ đầu nên video nhìn rời rạc thay vì
+liền mạch; (2) prompt thiếu quy tắc cụ thể để tránh tràn lề khi số lượng phần tử động lớn.
+
+**Đã sửa:**
+1. Thêm quy tắc vào `HYPERFRAMES_SCENE_PROMPT` (prompt.py): tính khoảng cách theo vùng an toàn thay vì gán
+   cứng px; nếu >4 phần tử động thì rút gọn kiểu "1, 2, 3, ..., n" (học đúng mẫu dùng trong
+   `transformer_explainer.mp4`); cấm chữ đè lên đường kẻ; yêu cầu sơ đồ lấp đầy vùng vẽ.
+2. **Refactor kiến trúc** `render_video_hyperframes.py`: tách hẳn "khung thương hiệu" (eyebrow, accent-bar,
+   tiêu đề, khung phụ đề có icon loa, nhãn nguồn) thành phần DO CODE RENDER CỐ ĐỊNH (dùng chung cho cả bản
+   mẫu an toàn lẫn cảnh AI thiết kế) — AI giờ chỉ còn đúng 1 việc: vẽ sơ đồ trong vùng canvas riêng 1728x440
+   (tọa độ cục bộ, không phải tọa độ toàn màn hình). Thu hẹp việc AI phải làm → giảm bề mặt lỗi, đồng thời
+   không cần guard "chữ nguyên văn" nữa (code render chữ, không phải AI).
+3. Trong lúc test thật, phát hiện thêm 1 bug MỚI do chính mình gây ra (`transform: scaleX(0)` trong CSS +
+   GSAP tween cùng thuộc tính transform → GSAP ghi đè mất giá trị CSS ban đầu) — phát hiện qua chính
+   `hyperframes check` (lint rule `gsap_css_transform_conflict`), không phải qua mắt thường. Sửa theo đúng
+   khuyến nghị của tool: dùng `tl.fromTo(...)` để GSAP set cả 2 đầu, bỏ transform tĩnh trong CSS.
+
+**Xác minh thật (không chỉ đọc code):** chạy `generate_ai_scene()` + `hyperframes check --snapshots` thật
+với API key thật — cả bản AI-designed lẫn bản fallback đều **pass sạch**: 0 lỗi lint, Layout 0 vấn đề/9
+mẫu, Contrast 46/46 và 22/22 đạt WCAG AA. Ảnh chụp xác nhận bố cục giống hệt phong cách video mẫu (header +
+khung phụ đề cố định, sơ đồ nằm gọn trong khung, không tràn/không đè chữ).
+
+**Lưu ý phát hiện phụ (không phải bug của mình):** ban đầu nghi ngờ `hyperframes check` trả exit code 0 dù
+in "Check failed" — hoá ra do lỗi test tự gây (`| tail -40` làm `$?` phản ánh exit code của `tail` chứ
+không phải `check`). Đọc guide `hyperframes-cli` xác nhận hành vi thật: `check` chạy lint trước và **bỏ qua
+hoàn toàn bước browser** (layout/motion/contrast = 0 mẫu) nếu lint có lỗi — đúng thiết kế, không phải gap.
+`validate_scene()` trong code mình dùng `subprocess.run(...).returncode` trực tiếp (không qua pipe) nên
+không dính lỗi này.
+
+**Kết luận:** đúng là do prompt/kiến trúc thiếu, không phải do model. Chưa render lại full video 32 câu để
+đo end-to-end (chỉ verify từng cảnh đơn lẻ qua `check`), nên chưa khẳng định 100% hết "lỗi nhiều" ở quy mô
+cả video — cần render lại 1 lần đầy đủ để xác nhận trước khi coi đây là "đạt".
