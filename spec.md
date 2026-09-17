@@ -51,22 +51,21 @@ Loại: [ ] Tối ưu tính năng có sẵn  [x] Tính năng mới
   ("không đưa sẵn tài liệu nào, agent tự tìm 100% trên mạng"). Đã sửa: slide giờ tuỳ chọn, chủ đề là input
   bắt buộc chính — xem Changelog.)*
 - Non-goals (≥3 thứ KHÔNG build, khác đề C3 gốc — ghi rõ để không bị hiểu nhầm sai đề):
-  1. **Không tự đối chiếu/cảnh báo khi 2 nguồn nói khác nhau** — có tìm nhiều nguồn (slide + web) nhưng
-     chưa có logic tự phát hiện mâu thuẫn giữa các nguồn như đề gốc mô tả ("hai nguồn nói ngược nhau").
-  2. **Không tự dựng video hoàn chỉnh trong luồng chính** — sản phẩm chính chỉ ra kịch bản (text) + hồ sơ
+  1. **Không tự dựng video hoàn chỉnh trong luồng chính** — sản phẩm chính chỉ ra kịch bản (text) + hồ sơ
      nguồn, đúng phạm vi C3 cho phép. *(Có làm thêm bonus "NÂNG CAO" — `codebase/backend/render_video.py`
      dựng video thật từ kịch bản agent viết ra bằng TTS + ffmpeg — nhưng đây là script riêng, không nằm
      trong luồng chính, không ảnh hưởng tiêu chí chấm chính theo đúng mô tả đề.)*
-  3. **Chưa tự động kiểm tra nguồn đã cũ** bằng cách fetch lại URL — có field `canhBao` đúng schema chính
+  2. **Chưa tự động kiểm tra nguồn đã cũ** bằng cách fetch lại URL — có field `canhBao` đúng schema chính
      thức BTC để AI tự cảnh báo dựa trên `ngayDang`, nhưng AI áp dụng không đều (soft-compliance, xem
      `eval/golden-set.md`).
-  4. **Feature B (Content QA) đã build trước khi đủ điều kiện tự đặt** — quyết định có chủ đích (17/9
+  3. **Feature B (Content QA) đã build trước khi đủ điều kiện tự đặt** — quyết định có chủ đích (17/9
      trưa, xem `BA.md`): mới có 1 lab coach xác nhận/feature (ngưỡng tự đặt là ≥2), đội trưởng vẫn quyết
      định build vì đánh giá impact cao. Feature A (Format QA) vẫn CHƯA build, giữ nguyên kế hoạch Phase 2.
 
-  *(2 non-goals bản trước — "không tự tìm tài liệu trên mạng" và "chưa có luồng sửa/viết lại từng câu" —
-  đã được XÂY THÊM đêm 17/9. Non-goal "chưa test chống prompt injection" cũng đã được XÂY THÊM và test thật
-  trưa 17/9 — không còn là non-goal, xem Changelog.)*
+  *(3 non-goals bản trước — "không tự tìm tài liệu trên mạng", "chưa có luồng sửa/viết lại từng câu", và
+  "không tự đối chiếu/cảnh báo khi 2 nguồn nói khác nhau" — đã được XÂY THÊM đêm 17/9 (nguồn mâu thuẫn giờ
+  có `moTaMauThuan` + Layer 5/7, test thật ở golden-set case 22). Non-goal "chưa test chống prompt
+  injection" cũng đã được XÂY THÊM và test thật trưa 17/9 — không còn là non-goal, xem Changelog.)*
 - Mức prototype nhắm tới: [ ] Sketch  [ ] Mock  [x] Working — phần nào mock, phần nào thật: đã nối AI thật (OpenAI `gpt-4o-mini`) từ CP3, không còn hardcode ở luồng chính. Có 1 nút riêng "Xem ví dụ demo offline" dùng data mẫu cố định, luôn hiện banner cảnh báo rõ ràng khi bật, không bao giờ tự động kích hoạt khi lỗi (xem `PLAN.md` mục 6 — nguyên tắc bắt buộc, tránh đánh lừa người xem lúc demo).
 - Automation: [x] augment  [ ] conditional  [ ] automate — lý do theo cost-of-error: sai thông tin trong kịch bản bài giảng khiến học viên học sai kiến thức ngay, chi phí sai rất cao → AI chỉ đề xuất kịch bản có trích dẫn, người viết/giảng viên vẫn phải duyệt trước khi dùng, không tự động publish.
 - §4b. Nguyên tắc đã áp dụng (≥4 — HAX/PAIR, xem guide):
