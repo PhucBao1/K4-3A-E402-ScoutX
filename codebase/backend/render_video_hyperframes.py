@@ -112,7 +112,10 @@ def _chrome_html(headline: str, caption: str, eyebrow: str, source_tag: str, dur
         f'{html.escape(headline)}</h1>\n'
         f'{source_tag_html}\n'
         f'<div id="chrome-caption-bar" class="clip" data-start="0" data-duration="{duration}">\n'
-        f'  <div id="chrome-caption-icon">&#128266;</div>\n'
+        f'  <div id="chrome-caption-icon">'
+        f'<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#0A0A0F" '
+        f'd="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-.77-3.29-2-4.24v8.48c1.23-.95 2-2.47 2-4.24z"/>'
+        f'</svg></div>\n'
         f'  <div id="chrome-caption-text">{html.escape(caption)}</div>\n'
         f'</div>'
     )
@@ -267,10 +270,17 @@ def generate_ai_scene(cau: dict, duration: float) -> dict | None:
     trong vùng #ai-content (1728x440, toạ độ 0,0 là góc trên-trái vùng này). Thu hẹp việc AI phải
     làm giúp giảm bề mặt lỗi (không cần guard chữ nguyên văn nữa vì AI không tự render chữ tiêu
     đề/phụ đề). Trả về None nếu AI lỗi/vi phạm ràng buộc kỹ thuật, để nơi gọi tự rớt về
-    render_scene_html() (bản mẫu cố định, an toàn tuyệt đối)."""
+    render_scene_html() (bản mẫu cố định, an toàn tuyệt đối).
+
+    Model gpt-5.4-mini (không phải gpt-4o-mini): thiết kế sơ đồ đòi hỏi vừa tuân thủ nhiều ràng
+    buộc kỹ thuật (toạ độ, JSON, quy tắc thẻ/card) vừa cần óc sáng tạo minh hoạ đúng nghĩa (vd vẽ
+    HÌNH NGÔI NHÀ thật thay vì chỉ 1 khung chữ nhật có chữ) — gpt-4o-mini pass hết check kỹ thuật
+    nhưng thường chọn thiết kế nhạt/chung chung. Đúng bài học đã có ở bước expand-script (case 33,
+    golden-set.md): đổi model thế hệ mới hơn cho bước cần sáng tạo giải quyết được phần lớn vấn đề
+    mà siết prompt thêm không giải quyết nổi."""
     try:
         resp = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5.4-mini",
             messages=[{"role": "user", "content": HYPERFRAMES_SCENE_PROMPT.format(
                 chu_tren_man_hinh=cau.get("chuTrenManHinh") or cau.get("loi", "")[:40],
                 loi=cau.get("loi", ""),
@@ -341,7 +351,7 @@ def fix_ai_scene(cau: dict, duration: float, ai_content: dict, findings: list[di
     ) or "(không có chi tiết lỗi)"
     try:
         resp = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5.4-mini",
             messages=[{"role": "user", "content": HYPERFRAMES_FIX_PROMPT.format(
                 current_html=ai_content["html"], current_gsap=ai_content["gsap"],
                 findings_text=findings_text,
