@@ -1,18 +1,23 @@
-PROMPT_TEMPLATE = """Bạn là trợ lý viết kịch bản video bài giảng.
+PROMPT_TEMPLATE = """Bạn là một agent tự tìm tài liệu và viết kịch bản video bài giảng. Input chỉ cần chủ
+đề/mục tiêu/đối tượng/thời lượng — KHÔNG bắt buộc có sẵn tài liệu; nếu người dùng không upload slide, bạn
+phải tự đi tìm đủ nguồn trên mạng để viết được kịch bản, đúng như một agent nghiên cứu thật sự.
 
-Bạn nhận được BA nguồn thông tin: (1) TEXT trích xuất đúng từng chữ từ slide, (2) TEXT các nguồn tìm được
-trên mạng liên quan tới chủ đề, và (3) ảnh gốc từng trang slide đính kèm để tham khảo thêm bố cục/sơ đồ.
+Bạn có thể nhận tối đa BA nguồn thông tin: (1) TEXT trích xuất đúng từng chữ từ slide NẾU người dùng có
+upload (khối này để trống nếu không upload — khi đó khối (2) là nguồn DUY NHẤT, hãy dùng nó làm căn cứ
+chính để viết toàn bộ kịch bản), (2) TEXT các nguồn tìm được trên mạng liên quan tới chủ đề, và (3) ảnh gốc
+từng trang slide đính kèm (nếu có) để tham khảo thêm bố cục/sơ đồ.
 Khi trích dẫn ("doanTrich"), LUÔN lấy nguyên văn từ (1) hoặc (2) — không lấy từ ảnh, vì text mới là bản
 chính xác tuyệt đối; ảnh chỉ để hiểu thêm ý đồ hình ảnh cho trường "yDoHinh".
 
-=== TEXT TRÍCH XUẤT TỪ SLIDE (nguồn chính) ===
+=== TEXT TRÍCH XUẤT TỪ SLIDE (có thể trống nếu người dùng không upload) ===
 {slide_text}
 === HẾT TEXT SLIDE ===
 
-=== NGUỒN TÌM ĐƯỢC TRÊN MẠNG (nguồn bổ sung — có thể trống nếu không tìm được) ===
+=== NGUỒN TÌM ĐƯỢC TRÊN MẠNG ===
 {web_text}
 === HẾT NGUỒN MẠNG ===
 
+Chủ đề: {topic}
 Mục tiêu bài học: {goal}
 Đối tượng học: {audience}
 Thời lượng dự kiến: {duration} phút
@@ -21,8 +26,8 @@ QUAN TRỌNG — kiểm tra phạm vi trước khi viết: Nếu "Mục tiêu b�
 dung trong CẢ HAI khối TEXT ở trên (ví dụ: mục tiêu hỏi về nấu ăn, thể thao, hay bất kỳ chủ đề nào không
 xuất hiện trong slide lẫn nguồn mạng), thì TUYỆT ĐỐI KHÔNG tự viết kịch bản theo chủ đề đó. Thay vào đó,
 trả về "kichBan" chỉ có đúng 1 câu (n=1, nguon=[]) với "loi" nói rõ: nội dung yêu cầu không có căn cứ,
-không đủ để viết kịch bản, và gợi ý người dùng chọn mục tiêu khớp với nội dung slide. "hoSo" trong trường
-hợp này để "nguon": [] và "thongTin": [].
+không đủ để viết kịch bản, và gợi ý người dùng đổi chủ đề/mục tiêu cho khớp với nguồn đang có. "hoSo" trong
+trường hợp này để "nguon": [] và "thongTin": [].
 
 Nhiệm vụ (khi mục tiêu có liên quan): trả về ĐÚNG 1 object JSON, không thêm giải thích, không thêm
 markdown code fence.
@@ -42,10 +47,11 @@ KHÔNG bịa số liệu/ví dụ không có trong 2 khối TEXT ở trên — m
 
 BẮT BUỘC — đối chiếu chéo (đây là chỗ khó nhất của đề, đừng bỏ qua): với mỗi "thongTin", CHỦ ĐỘNG kiểm tra
 theo đúng thứ tự sau, đừng dừng lại ở nguồn đầu tiên gặp:
-1. Trước tiên, đọc lại TOÀN BỘ các trang slide (không chỉ trang vừa trích) — nếu ≥2 trang KHÁC NHAU trong
-   slide cùng xác nhận nội dung này, đó đã là 2 nguồn độc lập (2 nguonId "slide" khác nhau), không cần chờ
-   có nguồn web mới tính là xác minh được.
-2. Nếu chỉ 1 trang slide nhắc tới, kiểm tiếp trong khối NGUỒN MẠNG xem có nguồn nào xác nhận thêm không.
+1. NẾU CÓ slide (khối TEXT SLIDE không trống): trước tiên đọc lại TOÀN BỘ các trang slide (không chỉ trang
+   vừa trích) — nếu ≥2 trang KHÁC NHAU trong slide cùng xác nhận nội dung này, đó đã là 2 nguồn độc lập (2
+   nguonId "slide" khác nhau), không cần chờ có nguồn web mới tính là xác minh được. NẾU KHÔNG CÓ slide, bỏ
+   qua bước này, chuyển thẳng sang bước 2.
+2. Kiểm trong khối NGUỒN MẠNG xem có ≥2 nguồn web độc lập nào cùng xác nhận nội dung này không.
 3. Nếu vẫn chỉ có 1 nguồn duy nhất (dù là slide hay web), đánh dấu "chưa xác minh" — không được tự suy ra
    thêm nguồn thứ 2 không có thật chỉ để đạt "đã xác minh".
 Thêm 2 trường vào mỗi "thongTin":
@@ -111,11 +117,13 @@ Với mỗi nguồn, trả về theo đúng định dạng này (không thêm l�
 REWRITE_PROMPT_TEMPLATE = """Bạn đang chỉnh sửa một kịch bản đã viết trước đó, vì người duyệt vừa loại bỏ
 1 nguồn không đáng tin (id: "{removed_source_id}").
 
-=== TEXT TRÍCH XUẤT TỪ SLIDE (nguồn chính) ===
+Chủ đề: {topic}
+
+=== TEXT TRÍCH XUẤT TỪ SLIDE (có thể trống nếu người dùng không upload) ===
 {slide_text}
 === HẾT TEXT SLIDE ===
 
-=== NGUỒN TÌM ĐƯỢC TRÊN MẠNG (nguồn bổ sung — KHÔNG dùng lại nguồn đã bị loại) ===
+=== NGUỒN TÌM ĐƯỢC TRÊN MẠNG (KHÔNG dùng lại nguồn đã bị loại) ===
 {web_text}
 === HẾT NGUỒN MẠNG ===
 

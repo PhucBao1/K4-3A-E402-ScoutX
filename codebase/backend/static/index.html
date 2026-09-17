@@ -187,16 +187,20 @@
 
 <header>
   <h1>ScriptScout</h1>
-  <p>Upload slide bài giảng (PDF) → AI đọc slide, viết kịch bản video, mỗi câu gắn đúng nguồn — bấm vào câu hoặc nguồn để xem chứng minh.</p>
+  <p>Nhập chủ đề (slide là tuỳ chọn) → AI tự tìm nguồn, viết kịch bản video, mỗi câu gắn đúng nguồn — bấm vào câu hoặc nguồn để xem chứng minh.</p>
 </header>
 <div class="banner warn">
-  ℹ️ AI đọc slide bạn upload, đồng thời tự tìm thêm 2-3 nguồn trên mạng liên quan tới chủ đề và chấm độ tin cậy từng nguồn. Bấm "Loại nguồn này" trên 1 nguồn để yêu cầu AI viết lại đúng những câu phụ thuộc vào nguồn đó — các câu khác giữ nguyên.
+  ℹ️ AI tự tìm 2-3 nguồn trên mạng theo chủ đề và chấm độ tin cậy từng nguồn; nếu có upload slide, AI đọc thêm slide làm nguồn bổ sung. Bấm "Loại nguồn này" trên 1 nguồn để yêu cầu AI viết lại đúng những câu phụ thuộc vào nguồn đó — các câu khác giữ nguyên.
 </div>
 
 <main>
   <div class="card">
-    <label for="slideFile">Slide bài giảng (PDF)</label>
+    <label for="topic">Chủ đề</label>
+    <input id="topic" placeholder="VD: Phân biệt AI, Machine Learning, Deep Learning, GenAI, LLM">
+
+    <label for="slideFile">Slide bài giảng (PDF) — không bắt buộc</label>
     <input id="slideFile" type="file" accept="application/pdf">
+    <p style="font-size:0.85em;color:#666;margin-top:4px;">Không có slide? Bỏ trống — AI sẽ tự tìm nguồn trên mạng theo chủ đề, đúng như một agent nghiên cứu thật sự.</p>
 
     <div class="row">
       <div>
@@ -221,7 +225,7 @@
       <button class="ghost" id="demoBtn">Xem ví dụ demo offline</button>
     </div>
 
-    <div id="loading"><span class="spinner"></span>Đang đọc slide và viết kịch bản…</div>
+    <div id="loading"><span class="spinner"></span>Đang tìm nguồn và viết kịch bản…</div>
     <div id="errorBox"></div>
   </div>
 
@@ -434,16 +438,13 @@ function showError(msg) {
 
 async function removeSourceAndRewrite(sourceId) {
   const fileInput = document.getElementById('slideFile');
-  if (!fileInput.files.length) {
-    showError('Không tìm thấy lại file slide đã upload — vui lòng chạy lại từ đầu.');
-    return;
-  }
   errorBox.style.display = 'none';
   loading.innerHTML = '<span class="spinner"></span>Đang viết lại các câu phụ thuộc nguồn vừa loại…';
   loading.classList.add('show');
 
   const formData = new FormData();
-  formData.append('file', fileInput.files[0]);
+  if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+  formData.append('topic', document.getElementById('topic').value);
   formData.append('goal', document.getElementById('goal').value);
   formData.append('audience', document.getElementById('audience').value);
   formData.append('duration', document.getElementById('duration').value);
@@ -474,7 +475,7 @@ async function removeSourceAndRewrite(sourceId) {
     showError(err.message || 'Không viết lại được, vui lòng thử lại.');
   } finally {
     loading.classList.remove('show');
-    loading.innerHTML = '<span class="spinner"></span>Đang đọc slide và viết kịch bản…';
+    loading.innerHTML = '<span class="spinner"></span>Đang tìm nguồn và viết kịch bản…';
   }
 }
 
@@ -490,7 +491,8 @@ function resetViewBeforeRun() {
 
 runBtn.addEventListener('click', async () => {
   const fileInput = document.getElementById('slideFile');
-  if (!fileInput.files.length) { showError('Vui lòng chọn file PDF slide trước.'); return; }
+  const topicInput = document.getElementById('topic');
+  if (!topicInput.value.trim()) { showError('Vui lòng nhập chủ đề trước.'); return; }
 
   resetViewBeforeRun();
   loading.classList.add('show');
@@ -499,7 +501,8 @@ runBtn.addEventListener('click', async () => {
   exportSourcesBtn.disabled = true;
 
   const formData = new FormData();
-  formData.append('file', fileInput.files[0]);
+  if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+  formData.append('topic', topicInput.value);
   formData.append('goal', document.getElementById('goal').value);
   formData.append('audience', document.getElementById('audience').value);
   formData.append('duration', document.getElementById('duration').value);

@@ -103,22 +103,27 @@ def find_ungrounded_numbers(data: dict, source_text: str) -> list[str]:
     mà câu đó trích dẫn — không phải chỉ cần có thật ở đâu đó trong tài liệu."""
     ho_so = data.get("hoSo", {})
     thongtin_by_id = {t["id"]: t for t in ho_so.get("thongTin", [])}
+    source_loai_by_id = {s["id"]: s.get("loai") for s in ho_so.get("nguon", [])}
     norm_source = _normalize_ws(source_text)
 
     problems = []
 
-    # Layer 4a — CHỈ bắt buộc khớp nguyên văn khi đoạn trích có chứa SỐ LIỆU (rủi ro thật nằm
-    # ở số bịa — case 1, 2). Đoạn trích thuần diễn giải khái niệm (không số) được nới lỏng vì
-    # test thật cho thấy AI hay nối 2 dòng slide bằng dấu chấm (source ngắt dòng, không chấm câu)
-    # → false positive nhiều nếu bắt khớp tuyệt đối 100% mọi đoạn trích, kể cả đoạn vô hại.
+    # Layer 4a — bắt buộc khớp nguyên văn khi đoạn trích có chứa SỐ LIỆU (rủi ro thật nằm ở số
+    # bịa — case 1, 2), HOẶC khi nguồn trích là "web" (web_text có sẵn đầy đủ, không có rủi ro
+    # false positive do slide ngắt dòng — phát hiện thật: chế độ không-slide để AI tự tìm nguồn,
+    # AI từng gắn "doanTrich" hoàn toàn bịa, không liên quan gì tới nội dung thật của URL, cho một
+    # nguồn web — không số nên lọt qua bản kiểm cũ). Đoạn trích thuần diễn giải khái niệm từ SLIDE
+    # (không số) vẫn được nới lỏng vì test thật cho thấy AI hay nối 2 dòng slide bằng dấu chấm
+    # (source ngắt dòng, không chấm câu) → false positive nếu bắt khớp tuyệt đối mọi đoạn trích.
     for t in ho_so.get("thongTin", []):
         for bc in t.get("bangChung", []):
             raw = bc.get("doanTrich", "") or ""
-            if not NUMBER_PATTERN.search(raw):
-                continue  # không có số → rủi ro thấp, không bắt buộc khớp tuyệt đối
+            is_web = source_loai_by_id.get(bc.get("nguonId")) == "web"
+            if not NUMBER_PATTERN.search(raw) and not is_web:
+                continue  # không có số, và không phải nguồn web → rủi ro thấp, không bắt buộc khớp tuyệt đối
             doan_trich = _normalize_ws(LEAD_IN_PREFIX.sub("", raw))
             if len(doan_trich) >= 4 and doan_trich not in norm_source:
-                problems.append(f"thongTin {t.get('id')} trích dẫn có số nhưng không khớp text gốc: \"{doan_trich[:60]}...\"")
+                problems.append(f"thongTin {t.get('id')} trích dẫn không khớp text gốc (nguồn {'web' if is_web else 'slide'}): \"{doan_trich[:60]}...\"")
 
     # Layer 4b — số liệu trong LỜI ĐỌC của câu phải nằm trong đúng "doanTrich" mà câu đó trích
     # dẫn (không phải "noiDung" — vì noiDung là AI tự diễn giải, có thể lẫn số bịa vào đó)
@@ -240,21 +245,29 @@ def validate_output(data: dict, source_text: str) -> None:
 
 @app.post("/generate")
 async def generate(
-    file: UploadFile = File(...),
+    topic: str = Form(...),
     goal: str = Form(...),
     audience: str = Form(...),
     duration: int = Form(...),
+    file: UploadFile | None = File(None),
 ):
-    pdf_bytes = await file.read()
-    doc = load_pdf(pdf_bytes)  # tự raise HTTPException nếu vượt giới hạn trang/dung lượng
-    source_text = extract_pdf_text(doc)
-    images_b64 = pdf_to_images_base64(doc)  # ảnh "low detail" — chỉ để hiểu bố cục/sơ đồ, không để trích dẫn
-    web_text = search_web_sources(goal)  # đúng lát cắt gợi ý BTC: "AI tìm 3 nguồn, chấm tin cậy"
+    # Đúng bài toán gốc C3: input chỉ cần chủ đề/mục tiêu/đối tượng/thời lượng, KHÔNG bắt buộc đưa
+    # sẵn tài liệu — slide là tuỳ chọn để bổ sung, không phải điều kiện bắt buộc để chạy.
+    if file is not None:
+        pdf_bytes = await file.read()
+        doc = load_pdf(pdf_bytes)  # tự raise HTTPException nếu vượt giới hạn trang/dung lượng
+        source_text = extract_pdf_text(doc)
+        images_b64 = pdf_to_images_base64(doc)  # ảnh "low detail" — chỉ để hiểu bố cục/sơ đồ, không để trích dẫn
+    else:
+        source_text = ""
+        images_b64 = []
+    web_text = search_web_sources(f"{topic}. {goal}")  # đúng lát cắt gợi ý BTC: "AI tìm 3 nguồn, chấm tin cậy"
     all_source_text = source_text + "\n\n" + web_text  # dùng chung cho validate_output() Layer 4
 
     prompt_text = PROMPT_TEMPLATE.format(
-        goal=goal, audience=audience, duration=duration,
-        slide_text=source_text, web_text=web_text or "(không tìm được nguồn ngoài, chỉ dùng slide)",
+        topic=topic, goal=goal, audience=audience, duration=duration,
+        slide_text=source_text or "(người dùng không upload slide — dùng nguồn mạng làm nguồn chính)",
+        web_text=web_text or "(không tìm được nguồn ngoài, chỉ dùng slide)",
     )
 
     # 3 lần thử (không phải 2) — test thật cho thấy lỗi ID không khớp (nguonId trong bangChung
@@ -275,13 +288,14 @@ async def generate(
 
 @app.post("/rewrite")
 async def rewrite(
-    file: UploadFile = File(...),
+    topic: str = Form(...),
     goal: str = Form(...),
     audience: str = Form(...),
     duration: int = Form(...),
     ho_so_json: str = Form(...),
     kich_ban_json: str = Form(...),
     removed_source_id: str = Form(...),
+    file: UploadFile | None = File(None),
 ):
     """Đúng lát cắt gợi ý BTC: "người viết loại một nguồn → chỉ câu phụ thuộc viết lại".
     Chỉ viết lại đúng các câu phụ thuộc vào nguồn bị loại, giữ nguyên các câu khác — không phải
@@ -307,16 +321,21 @@ async def rewrite(
         # không câu nào phụ thuộc nguồn bị loại — chỉ cần bỏ nguồn khỏi hồ sơ, kịch bản giữ nguyên
         return {"hoSo": remaining_ho_so, "kichBan": kich_ban, "rewrittenNs": []}
 
-    pdf_bytes = await file.read()
-    doc = load_pdf(pdf_bytes)
-    source_text = extract_pdf_text(doc)
-    images_b64 = pdf_to_images_base64(doc)
-    web_text = search_web_sources(goal)
+    if file is not None:
+        pdf_bytes = await file.read()
+        doc = load_pdf(pdf_bytes)
+        source_text = extract_pdf_text(doc)
+        images_b64 = pdf_to_images_base64(doc)
+    else:
+        source_text = ""
+        images_b64 = []
+    web_text = search_web_sources(f"{topic}. {goal}")
     all_source_text = source_text + "\n\n" + web_text
 
     rewrite_prompt = REWRITE_PROMPT_TEMPLATE.format(
-        goal=goal, audience=audience, duration=duration,
-        slide_text=source_text, web_text=web_text or "(không tìm được nguồn ngoài)",
+        topic=topic, goal=goal, audience=audience, duration=duration,
+        slide_text=source_text or "(không có slide — dùng nguồn mạng làm nguồn chính)",
+        web_text=web_text or "(không tìm được nguồn ngoài)",
         removed_source_id=removed_source_id,
         remaining_ho_so=json.dumps(remaining_ho_so, ensure_ascii=False),
         affected_sentences=json.dumps(affected_cau, ensure_ascii=False),
