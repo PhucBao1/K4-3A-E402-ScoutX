@@ -408,7 +408,13 @@ def expand_script_with_analogy(kich_ban: dict, so_cau_con_thieu: int | None = No
 
     try:
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            # gpt-5.4-mini, KHÔNG PHẢI gpt-4o-mini như phần sinh kịch bản chính — phát hiện thật
+            # (case 32, eval/golden-set.md): gpt-4o-mini tái tạo câu gốc không khớp tuyệt đối từng
+            # ký tự ~1/3 số lần gọi (Guard 1 chặn oan), dù JSON đã đúng schema (Structured Outputs).
+            # Test 5/5 lần với gpt-5.4-mini đều pass cả 2 guard — model thế hệ mới hơn tin cậy hơn
+            # hẳn cho việc "vừa tái tạo verbatim vừa sinh nội dung mới" trong cùng 1 lượt gọi. Chỉ
+            # đổi cho bước MỞ RỘNG này — /generate chính vẫn dùng gpt-4o-mini, không đổi.
+            model="gpt-5.4-mini",
             messages=[{"role": "user", "content": EXPAND_SCRIPT_PROMPT.format(
                 kich_ban_json=json.dumps(original_cau, ensure_ascii=False),
                 goi_y_so_luong=goi_y_so_luong)}],

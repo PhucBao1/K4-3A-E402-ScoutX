@@ -378,3 +378,28 @@ dự án. Việc "kịch bản thật sự đủ 4 phút" với gpt-4o-mini + ki
 ổn định — để lại làm tiếp (hướng khả thi chưa thử: model mạnh hơn cho riêng bước expand, hoặc nới Guard 1
 sang so khớp sau khi chuẩn hoá khoảng trắng/dấu câu thay vì so chuỗi tuyệt đối — cần cân nhắc kỹ vì đây là
 lớp bảo vệ "không sửa câu gốc", nới lỏng sai cách có thể mở lỗ hổng thật).
+
+## Case 33 — đổi model bước expand sang gpt-5.4-mini: GIẢI QUYẾT ĐƯỢC PHẦN LỚN
+
+Thử đúng hướng "chưa làm" ở case 32: đổi `expand_script_with_analogy()` từ `gpt-4o-mini` sang `gpt-5.4-mini`
+(thế hệ mới hơn, tài khoản có sẵn — kiểm tra qua `client.models.list()`, KHÔNG đổi model của `/generate`
+chính). Giữ nguyên Structured Outputs + toàn bộ guard.
+
+**Kết quả test thật:**
+- **Gọi trực tiếp 5 lần** (không qua vòng lặp) với đúng kịch bản thật (5 câu gốc): **5/5 lần pass cả 2
+  guard** (Guard 1 giữ nguyên câu gốc + Guard 2/2b) — so với gpt-4o-mini trước đó chỉ ~2/3 (67%) lần pass.
+- **Chạy full `/expand-script-full` (target 34 câu) 3 lần độc lập:**
+  - Lần 1: 5→**20 câu** (3 vòng) · Lần 2: 5→**30 câu** (chỉ 2 vòng!) · Lần 3: 5→**20 câu** (3 vòng).
+  - **3/3 lần đều thành công có tiến triển** (trước với gpt-4o-mini: 2/3 lần thất bại hoàn toàn ngay vòng
+    1). Tốt nhất đạt **30/34 = 88%** — gần sát mục tiêu 4 phút thật, tốt hơn hẳn mức 41-59% trước đó.
+  - Vẫn dừng vì `no-progress` ở cả 3 lần (không đạt tuyệt đối 34/34) — nhưng đây là giới hạn tự nhiên hợp
+    lý (hết ý minh hoạ mới thật sự khác biệt để thêm, đúng đúng tinh thần "thà ngắn hơn còn hơn lặp ý"),
+    không còn là lỗi model tái tạo verbatim sai như trước.
+- **Chi phí:** gpt-5.4-mini đắt hơn gpt-4o-mini ~5x input / ~7.5x output ($0,75/$4,50 so với $0,15/$0,60
+  mỗi 1 triệu token) — nhưng vì bước expand chỉ gọi 2-4 lần với prompt ngắn mỗi video, tổng chi phí tuyệt
+  đối vẫn rất nhỏ (ước tính vài cent/video), chấp nhận được cho mức cải thiện độ tin cậy này.
+
+**Kết luận:** đây là fix ĐÚNG NGUYÊN NHÂN GỐC thật sự — không phải lỗi kiến trúc lặp hay guard, mà là giới
+hạn năng lực gpt-4o-mini khi phải vừa tái tạo verbatim vừa sáng tạo nội dung mới trong 1 lượt gọi dài. Đổi
+sang model thế hệ mới hơn cho riêng bước này giải quyết được phần lớn (không phải 100%, nhưng từ "thường
+thất bại" → "thường đạt gần target"). Khuyến nghị: áp dụng model này làm mặc định cho `/expand-script-full`.
