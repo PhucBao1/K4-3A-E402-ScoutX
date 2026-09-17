@@ -401,8 +401,9 @@ RÀNG BUỘC KỸ THUẬT (vi phạm sẽ bị huỷ, dùng bản mẫu an toàn
   độ đậm tương phản rõ (vd 700-900) so với nhãn phụ nhạt hơn (400-500) — không dùng chữ cùng 1 độ đậm cho
   mọi thứ, nhìn sẽ phẳng/thiếu phân cấp.
 - KHÔNG ĐỨNG YÊN: nếu {duration} giây > 4.5, sau hiệu ứng xuất hiện ban đầu PHẢI thêm 1 chuyển động nền nhẹ
-  lặp lại tới hết cảnh (vd scale 1↔1.03 kiểu "thở" bằng yoyo:true,repeat:-1, hoặc trôi nhẹ vài px) — không
-  để sơ đồ đứng hình hoàn toàn sau khi vẽ/xuất hiện xong.
+  lặp lại tới hết cảnh (vd scale 1↔1.03 kiểu "thở" bằng yoyo:true,repeat:999 — dùng SỐ LỚN CỤ THỂ như 999,
+  KHÔNG dùng repeat:-1 dù cùng hiệu ứng, vì repeat:-1 bị cảnh báo lỗi — hoặc trôi nhẹ vài px) — không để sơ
+  đồ đứng hình hoàn toàn sau khi vẽ/xuất hiện xong.
 - TRÁNH mẫu nhìn rẻ tiền/lặp lại: không dùng nhiều thẻ/card giống hệt nhau không có gì phân biệt, không chỉ
   dùng 1 dải màu viền trái làm cách trang trí duy nhất, không vẽ hình tròn/khối màu không mang ý nghĩa gì.
 - KHÔNG dùng Math.random(), Date.now(), fetch, hay bất kỳ nguồn ngẫu nhiên/không xác định nào.
@@ -417,4 +418,26 @@ Trả về ĐÚNG JSON, không thêm chữ nào khác:
   "gsap": ["tl.fromTo(\\"#pathId\\", {{strokeDashoffset:1000}}, {{strokeDashoffset:0,duration:1.2,ease:\\"power2.inOut\\"}}, 0)", "tl.fromTo(\\"#id\\", {{opacity:0}}, {{opacity:1,duration:0.5}}, 0)", "..."]}}
 "gsap" là mảng các dòng lệnh GSAP (timeline đã có sẵn tên "tl", KHÔNG khai báo lại), mỗi dòng 1 lệnh
 tl.to/tl.from/tl.fromTo hợp lệ, thời điểm bắt đầu tuyệt đối theo giây trong khoảng [0, {duration}].
+"""
+
+
+# Vòng tự-sửa: dùng lỗi THẬT từ `hyperframes lint --json` (nhanh, không cần trình duyệt, ~1.3s so với
+# ~6.7s của `check` đầy đủ) để AI sửa ĐÚNG chỗ sai, thay vì đoán lại từ đầu (retry mù trước đây).
+HYPERFRAMES_FIX_PROMPT = """Đoạn HTML/GSAP dưới đây bạn (hoặc 1 lượt AI trước) đã viết cho 1 cảnh HyperFrames,
+nhưng công cụ `hyperframes lint` phát hiện lỗi cụ thể. SỬA ĐÚNG những lỗi được liệt kê, GIỮ NGUYÊN mọi phần
+khác (bố cục, nội dung, animation không liên quan tới lỗi) — không viết lại từ đầu, không đổi ý tưởng thiết
+kế đã có, chỉ sửa đúng chỗ báo lỗi.
+
+HTML hiện tại:
+{current_html}
+
+GSAP hiện tại:
+{current_gsap}
+
+LỖI THẬT từ hyperframes lint (sửa đúng từng lỗi này):
+{findings_text}
+
+Trả về ĐÚNG JSON, không thêm chữ nào khác, đúng định dạng như ban đầu:
+{{"html": "<...toàn bộ HTML đã sửa lỗi, giữ nguyên phần không liên quan...>",
+  "gsap": ["...toàn bộ danh sách lệnh GSAP đã sửa lỗi, giữ nguyên dòng không liên quan..."]}}
 """

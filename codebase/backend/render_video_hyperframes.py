@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from render_video import audio_duration_sec, make_silence, tts_to_file
 from render_video import client as openai_client
-from prompt import HYPERFRAMES_SCENE_PROMPT
+from prompt import HYPERFRAMES_FIX_PROMPT, HYPERFRAMES_SCENE_PROMPT
 
 _HOME = os.path.expanduser("~")
 _DEFAULT_NODE_BIN = os.path.join(_HOME, ".local/hyperframes-tools/node/bin")
@@ -118,15 +118,17 @@ def _chrome_html(headline: str, caption: str, eyebrow: str, source_tag: str, dur
     )
 
 
-def _chrome_gsap(fade_out_start: float) -> str:
-    return "\n      ".join([
+def _chrome_gsap(fade_out_start: float, has_source_tag: bool = True) -> str:
+    lines = [
         'tl.to("#chrome-eyebrow", {opacity:1,duration:0.4}, 0.1);',
         'tl.fromTo("#chrome-accent-bar", {scaleX:0}, {scaleX:1,duration:0.5}, 0.3);',
         'tl.fromTo("#chrome-headline", {opacity:0,y:24}, {opacity:1,y:0,duration:0.6}, 0.4);',
-        'tl.to("#chrome-source-tag", {opacity:1,duration:0.4}, 0.6);',
-        'tl.fromTo("#chrome-caption-bar", {opacity:0,y:16}, {opacity:1,y:0,duration:0.5}, 1.0);',
-        f'tl.to("#root", {{opacity:0,duration:0.35}}, {fade_out_start});',
-    ])
+    ]
+    if has_source_tag:
+        lines.append('tl.to("#chrome-source-tag", {opacity:1,duration:0.4}, 0.6);')
+    lines.append('tl.fromTo("#chrome-caption-bar", {opacity:0,y:16}, {opacity:1,y:0,duration:0.5}, 1.0);')
+    lines.append(f'tl.to("#root", {{opacity:0,duration:0.35}}, {fade_out_start});')
+    return "\n      ".join(lines)
 
 
 SCENE_TEMPLATE = """<!doctype html>
@@ -208,7 +210,7 @@ def render_scene_html(cau: dict, duration: float) -> str:
     chrome_html = _chrome_html(headline, caption, eyebrow, goi_y, duration)
     return SCENE_TEMPLATE.format(
         duration=duration, chrome_style=_CHROME_STYLE, chrome_html=chrome_html,
-        chrome_gsap=_chrome_gsap(fade_out_start),
+        chrome_gsap=_chrome_gsap(fade_out_start, has_source_tag=bool(goi_y)),
     )
 
 
@@ -295,10 +297,11 @@ def build_ai_scene_html(cau: dict, ai_content: dict, duration: float) -> str:
     fade_out_start = max(duration - 0.4, 0.1)
     headline = cau.get("chuTrenManHinh") or cau.get("loi", "")[:40]
     caption = cau.get("loi", "")
-    chrome_html = _chrome_html(headline, caption, "ScriptScout", cau.get("goiYHienNguon", ""), duration)
+    goi_y = cau.get("goiYHienNguon", "")
+    chrome_html = _chrome_html(headline, caption, "ScriptScout", goi_y, duration)
     return AI_SCENE_WRAPPER.format(
         duration=duration, chrome_style=_CHROME_STYLE, chrome_html=chrome_html,
-        chrome_gsap=_chrome_gsap(fade_out_start),
+        chrome_gsap=_chrome_gsap(fade_out_start, has_source_tag=bool(goi_y)),
         ai_html=ai_content["html"], ai_gsap=ai_content["gsap"],
     )
 
@@ -312,6 +315,52 @@ def validate_scene(project_dir: str) -> bool:
         capture_output=True, env=_run_env(),
     )
     return result.returncode == 0
+
+
+def lint_scene(project_dir: str) -> dict:
+    """Chạy `hyperframes lint --json` — CHỈ ~1.3s (không mở trình duyệt) so với ~6.7s của
+    `check` đầy đủ, dùng làm vòng lặp tự-sửa NHANH trước khi tốn browser cho check cuối cùng.
+    Trả {"ok": bool, "findings": [...]} — findings có code/message/selector/fixHint thật."""
+    result = subprocess.run(
+        [_bin_path("hyperframes"), "lint", project_dir, "--json"],
+        capture_output=True, env=_run_env(), text=True,
+    )
+    try:
+        return json.loads(result.stdout)
+    except (json.JSONDecodeError, ValueError):
+        return {"ok": result.returncode == 0, "findings": []}
+
+
+def fix_ai_scene(cau: dict, duration: float, ai_content: dict, findings: list[dict]) -> dict | None:
+    """Cho AI sửa ĐÚNG lỗi lint thật báo về (code/message/fixHint), thay vì đoán lại từ đầu như
+    retry mù trước đây — nhanh hơn nhiều vì input đã có sẵn bản thiết kế cũ, AI chỉ vá chỗ sai."""
+    findings_text = "\n".join(
+        f"- [{f.get('code', '?')}] {f.get('selector', '')}: {f.get('message', '')}"
+        f" — Cách sửa gợi ý: {f.get('fixHint', '')}"
+        for f in findings
+    ) or "(không có chi tiết lỗi)"
+    try:
+        resp = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": HYPERFRAMES_FIX_PROMPT.format(
+                current_html=ai_content["html"], current_gsap=ai_content["gsap"],
+                findings_text=findings_text,
+            )}],
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(resp.choices[0].message.content)
+        ai_html = data.get("html", "")
+        ai_gsap = data.get("gsap", [])
+        if not ai_html or not isinstance(ai_gsap, list):
+            return None
+        if any(bad in ai_html for bad in ("<script", "Math.random", "Date.now", "fetch(")):
+            return None
+        if any(not isinstance(line, str) or not line.strip().startswith("tl.") for line in ai_gsap):
+            return None
+        return {"html": ai_html, "gsap": "\n      ".join(ai_gsap)}
+    except Exception as e:
+        print(f"[HyperFrames AI] Sửa lỗi scene thất bại: {e}")
+        return None
 
 
 def render_scene_video(project_dir: str, out_mp4: str) -> None:
@@ -345,23 +394,44 @@ def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
         duration = float(cau.get("dungGiay", SILENCE_DEFAULT_SEC))
         make_silence(audio_path, duration)
 
-    # AI có tính ngẫu nhiên — cùng 1 câu có lúc pass có lúc fail check (phát hiện thật khi
-    # test lại nhiều lần). Thử tối đa 3 lần trước khi rớt về bản mẫu an toàn, giống đúng
-    # pattern retry 3 lần đã dùng ở /generate (main.py) thay vì rớt ngay sau 1 lần thử.
+    # Vòng tự-sửa (nhanh hơn hẳn retry-mù trước đây): mỗi vòng sinh mới (tối đa 2 vòng), sau khi
+    # có bản thiết kế thì dùng `lint --json` (~1.3s, không mở trình duyệt) để lấy lỗi THẬT, cho AI
+    # vá đúng chỗ sai (tối đa 2 lần vá/vòng) thay vì đoán lại từ đầu. Chỉ tốn `check` đầy đủ
+    # (~6.7s, có trình duyệt) làm cổng cuối cùng SAU KHI lint đã sạch — không chạy check ở mỗi
+    # bước lint như bản cũ, giảm đáng kể số lần phải mở trình duyệt.
     index_path = os.path.join(project_dir, "index.html")
     used_ai_scene = False
-    for attempt in range(3):
+    for gen_round in range(2):
         ai_content = generate_ai_scene(cau, duration)
         if ai_content is None:
             continue
         with open(index_path, "w", encoding="utf-8") as f:
             f.write(build_ai_scene_html(cau, ai_content, duration))
+
+        lint_result = lint_scene(project_dir)
+        for fix_attempt in range(2):
+            if lint_result.get("ok"):
+                break
+            findings = lint_result.get("findings", [])
+            print(f"[HyperFrames] Cảnh {n}: lint thấy {len(findings)} lỗi, cho AI vá lần {fix_attempt + 1}...")
+            fixed = fix_ai_scene(cau, duration, ai_content, findings)
+            if fixed is None:
+                break
+            ai_content = fixed
+            with open(index_path, "w", encoding="utf-8") as f:
+                f.write(build_ai_scene_html(cau, ai_content, duration))
+            lint_result = lint_scene(project_dir)
+
+        if not lint_result.get("ok"):
+            print(f"[HyperFrames] Cảnh {n}: vòng sinh {gen_round + 1} vẫn còn lỗi lint, thử sinh lại...")
+            continue
+
         if validate_scene(project_dir):
             used_ai_scene = True
             break
-        print(f"[HyperFrames] Cảnh {n}: AI-designed layout lần {attempt + 1} không qua check, thử lại...")
+        print(f"[HyperFrames] Cảnh {n}: qua lint nhưng check đầy đủ vẫn fail (vòng {gen_round + 1}), thử sinh lại...")
     if not used_ai_scene:
-        print(f"[HyperFrames] Cảnh {n}: hết 3 lần thử, dùng bản mẫu an toàn.")
+        print(f"[HyperFrames] Cảnh {n}: hết các vòng thử, dùng bản mẫu an toàn.")
         with open(index_path, "w", encoding="utf-8") as f:
             f.write(render_scene_html(cau, duration))
 
@@ -380,12 +450,13 @@ def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
     return segment_path
 
 
-def render(kich_ban: dict, out_mp4: str, max_workers: int = 4) -> None:
-    """Chạy SONG SONG nhiều câu cùng lúc (mặc định 4 luồng) thay vì tuần tự từng câu — mỗi câu
+def render(kich_ban: dict, out_mp4: str, max_workers: int = 6) -> None:
+    """Chạy SONG SONG nhiều câu cùng lúc (mặc định 6 luồng) thay vì tuần tự từng câu — mỗi câu
     độc lập hoàn toàn (TTS + AI thiết kế + render riêng), chỉ cần ghép nối đúng THỨ TỰ ở bước
-    cuối. Tốc độ tổng thể tăng gần đúng theo số luồng (máy 12 core, mỗi luồng ăn ~300-400MB cho
-    1 Chrome headless riêng — 4 luồng vẫn thoải mái với máy 15GB RAM). Tăng max_workers nếu máy
-    khoẻ hơn, giảm nếu thấy hết RAM/CPU quá tải."""
+    cuối. Tốc độ tổng thể tăng gần đúng theo số luồng (máy 12 core, nhưng RAM THẬT khả dụng lúc đo
+    chỉ ~6.7GB do máy đang chạy nhiều app khác — mỗi luồng ăn ~300-400MB cho 1 Chrome headless
+    riêng, 6 luồng ~2-2.4GB vẫn an toàn). Tăng max_workers nếu máy rảnh hơn/nhiều RAM hơn, giảm
+    nếu thấy hết RAM/CPU quá tải (kiểm bằng `free -h` trước khi tăng)."""
     cau_list = kich_ban.get("cau", [])
     n_workers = min(max_workers, len(cau_list)) or 1
     with tempfile.TemporaryDirectory() as tmp:
