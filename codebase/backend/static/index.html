@@ -660,12 +660,20 @@ runBtn.addEventListener('click', async () => {
     exportScriptBtn.disabled = false;
     exportSourcesBtn.disabled = false;
     renderVideoBtn.disabled = false;
-  expandScriptBtn.disabled = false;
+    expandScriptBtn.disabled = false;
+
+    // Mặc định tự làm phong phú kịch bản ngay sau khi generate xong — trước đây phải bấm tay
+    // nút "Làm phong phú kịch bản", nhiều người không biết nút này ở đâu nên tưởng hệ thống
+    // luôn trả kịch bản ngắn. Vẫn giữ nguyên guard an toàn của /expand-script (tự rớt về bản
+    // gốc nếu AI vi phạm luật) — chỉ đổi chỗ gọi từ "bấm tay" sang "tự động gọi 1 lần".
+    loading.innerHTML = '<span class="spinner"></span>Đang làm phong phú kịch bản…';
+    await expandScript({ silent: true });
   } catch (err) {
     // KHÔNG tự động render dữ liệu mẫu khi lỗi — chỉ hiện error state (xem PLAN.md mục 6)
     showError(err.message || 'Không gọi được hệ thống, vui lòng thử lại.');
   } finally {
     loading.classList.remove('show');
+    loading.innerHTML = '<span class="spinner"></span>Đang tìm nguồn và viết kịch bản…';
     runBtn.disabled = false;
   }
 });
@@ -681,9 +689,9 @@ exportSourcesBtn.addEventListener('click', () => {
   downloadJSON(out, 'scriptscout-ho-so-nguon.json');
 });
 
-expandScriptBtn.addEventListener('click', async () => {
+async function expandScript({ silent = false } = {}) {
   if (!AppState.kichBanJson) return;
-  errorBox.style.display = 'none';
+  if (!silent) errorBox.style.display = 'none';
   expandScriptBtn.disabled = true;
   const originalExpandText = expandScriptBtn.textContent;
   expandScriptBtn.textContent = '✨ Đang làm phong phú…';
@@ -699,7 +707,9 @@ expandScriptBtn.addEventListener('click', async () => {
     }
     const data = await res.json();
     if (!data.daMoRong) {
-      showError('Không mở rộng được lần này (AI vi phạm luật hoặc lỗi) — giữ nguyên kịch bản gốc, thử lại sau.');
+      // silent (tự động sau /generate) — không coi là lỗi, kịch bản gốc vẫn dùng bình thường,
+      // chỉ báo khi người dùng CHỦ ĐỘNG bấm nút để thử làm phong phú thêm lần nữa
+      if (!silent) showError('Không mở rộng được lần này (AI vi phạm luật hoặc lỗi) — giữ nguyên kịch bản gốc, thử lại sau.');
     } else {
       AppState.kichBanJson = data.kichBan;
       const mapped = mapOfficialToInternal(AppState.hoSoJson, data.kichBan);
@@ -708,12 +718,14 @@ expandScriptBtn.addEventListener('click', async () => {
       renderQaContentRows();
     }
   } catch (err) {
-    showError(err.message || 'Không mở rộng được, vui lòng thử lại.');
+    if (!silent) showError(err.message || 'Không mở rộng được, vui lòng thử lại.');
   } finally {
     expandScriptBtn.disabled = false;
     expandScriptBtn.textContent = originalExpandText;
   }
-});
+}
+
+expandScriptBtn.addEventListener('click', () => expandScript({ silent: false }));
 
 renderVideoBtn.addEventListener('click', async () => {
   if (!AppState.kichBanJson) return;
