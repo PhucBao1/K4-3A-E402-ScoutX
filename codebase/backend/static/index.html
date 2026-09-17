@@ -355,6 +355,16 @@ function mapOfficialToInternal(hoSo, kichBan) {
       if (!src) return;
       src.excerpt += `<div style="margin-bottom:8px;"><b>${escapeHtml(t.noiDung)}</b><br>` +
         `${escapeHtml(bc.doanTrich)}${bc.viTri ? ' <i>(' + escapeHtml(bc.viTri) + ')</i>' : ''}</div>`;
+      // Bonus: hiện cảnh báo mâu thuẫn ngay tại đây — nút "Loại nguồn này" có sẵn trên các nguồn
+      // khác chính là hành động "chọn" (loại bên không tin, giữ bên đang xem).
+      if (t.moTaMauThuan) {
+        const otherIds = (t.bangChung || []).map(b => b.nguonId).filter(id => id !== bc.nguonId);
+        const otherNames = otherIds.map(id => sourceById[id] ? sourceById[id].title : id).join(', ');
+        src.excerpt += `<div style="margin-bottom:8px;padding:8px;background:#fff3cd;border:1px solid #ffe58f;border-radius:6px;">` +
+          `⚠️ <b>Mâu thuẫn với nguồn khác:</b> ${escapeHtml(t.moTaMauThuan)}` +
+          (otherNames ? `<br><i>Đối chiếu với: ${escapeHtml(otherNames)}. Muốn giữ nguồn này, bấm "Loại nguồn này" trên nguồn kia ở danh sách bên trên.</i>` : '') +
+          `</div>`;
+      }
     });
   });
   sources.forEach(s => { if (!s.excerpt) s.excerpt = '(chưa có trích dẫn cụ thể)'; });
