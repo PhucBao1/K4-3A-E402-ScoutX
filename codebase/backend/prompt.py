@@ -209,3 +209,24 @@ Danh sách cặp cần chấm (JSON):
 Trả về ĐÚNG JSON, không thêm chữ nào khác:
 {{"ketQua": [{{"n": <số câu>, "nhan": "khop"|"lech-nhe"|"lech-noi-dung", "mucNghiemTrong": "thap"|"trung-binh"|"cao", "giaiThich": "<1 câu ngắn, cụ thể chỗ nào khác nếu có>"}}, ...]}}
 """
+
+QA_CONTENT_FROM_TRANSCRIPT_PROMPT = """Bạn là người kiểm tra nội dung video bài giảng đã dựng so với kịch
+bản đã duyệt (Feature B). Đúng quy trình thật của đội QA/QC: nghe lại video, chuyển thành văn bản, rồi đối
+chiếu văn bản đó với kịch bản — bạn đang làm bước đối chiếu đó, thay cho việc con người ngồi nghe tay.
+
+KỊCH BẢN ĐÃ DUYỆT (danh sách câu theo đúng thứ tự, mỗi câu có số "n" và lời "loi"):
+{script_json}
+
+BẢN CHÉP LỜI THẬT của video đã dựng (nghe được từ audio thật, viết liền mạch không chia sẵn theo câu):
+{transcript_text}
+
+Nhiệm vụ: với MỖI câu trong kịch bản, tìm đúng đoạn tương ứng trong bản chép lời (dựa theo đúng thứ tự
+xuất hiện trong bản chép lời và nội dung gần giống nhất), rồi so sánh NGỮ NGHĨA (không so chữ tuyệt đối):
+- "khop": ý giữ nguyên hệt, chỉ khác cách diễn đạt bình thường hoặc giống hệt.
+- "lech-nhe": diễn đạt khác nhiều hơn nhưng Ý CHÍNH vẫn giữ nguyên, KHÔNG đổi số liệu/tên riêng/kết luận.
+- "lech-noi-dung": số liệu, tên riêng, hoặc ý/kết luận đã ĐỔI KHÁC so với bản duyệt.
+- "thieu": không tìm thấy đoạn nào trong bản chép lời tương ứng với câu này (có thể bị cắt/bỏ sót khi thu).
+
+Trả về ĐÚNG JSON, không thêm chữ nào khác:
+{{"ketQua": [{{"n": <số câu>, "nhan": "khop"|"lech-nhe"|"lech-noi-dung"|"thieu", "mucNghiemTrong": "thap"|"trung-binh"|"cao", "giaiThich": "<1 câu ngắn, trích đúng đoạn tương ứng tìm được trong bản chép lời nếu có>"}}, ...]}}
+"""

@@ -16,6 +16,7 @@ from render_video import render as render_video_to_mp4
 from prompt import (
     JUDGE_RELEVANCE_PROMPT,
     PROMPT_TEMPLATE,
+    QA_CONTENT_FROM_TRANSCRIPT_PROMPT,
     QA_CONTENT_PROMPT,
     RETRY_SUFFIX,
     REWRITE_PROMPT_TEMPLATE,
@@ -347,6 +348,52 @@ async def qa_content_endpoint(pairs_json: str = Form(...)):
     """pairs_json: JSON list [{"n": 1, "loiGoc": "...", "loiTrongVideo": "..."}, ...]"""
     pairs = json.loads(pairs_json)
     return {"ketQua": check_content_conformance(pairs)}
+
+
+def transcribe_audio(file_bytes: bytes, filename: str) -> str:
+    """Bước "nghe lại video" của lab coach A (BA.md mục 2) — tự động hoá bằng Whisper, cùng
+    OpenAI key hiện có. mp4/mp3/wav/m4a/webm đều được Whisper API hỗ trợ trực tiếp, không cần
+    tự tách audio bằng ffmpeg trước."""
+    tmp_path = tempfile.mktemp(suffix=os.path.splitext(filename)[1] or ".mp4")
+    with open(tmp_path, "wb") as f:
+        f.write(file_bytes)
+    try:
+        with open(tmp_path, "rb") as f:
+            result = client.audio.transcriptions.create(model="whisper-1", file=f)
+        return result.text
+    finally:
+        os.remove(tmp_path)
+
+
+def check_content_conformance_from_transcript(cau_list: list[dict], transcript_text: str) -> list[dict]:
+    """Feature B, đường thật: thay vì người dùng gõ tay giả lập câu lệch (check_content_conformance),
+    lấy đúng bản chép lời THẬT từ audio/video người dùng upload (qua transcribe_audio) rồi để AI tự
+    đối chiếu — đúng 3 bước lab coach A mô tả: nghe, chuyển văn bản, đối chiếu, AI làm hết."""
+    script = [{"n": c["n"], "loi": c["loi"]} for c in cau_list if c.get("loi")]
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": QA_CONTENT_FROM_TRANSCRIPT_PROMPT.format(
+            script_json=json.dumps(script, ensure_ascii=False), transcript_text=transcript_text)}],
+        response_format={"type": "json_object"},
+    )
+    parsed = json.loads(resp.choices[0].message.content)
+    results_by_n = {r["n"]: r for r in parsed.get("ketQua", [])}
+    return [results_by_n.get(c["n"], {
+        "n": c["n"], "nhan": "loi", "mucNghiemTrong": "khong-ro", "giaiThich": "Không chấm được",
+    }) for c in script]
+
+
+@app.post("/qa-content-from-audio")
+async def qa_content_from_audio_endpoint(
+    kich_ban_json: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """Đường thật của Feature B — xem check_content_conformance_from_transcript()."""
+    kich_ban = json.loads(kich_ban_json)
+    audio_bytes = await file.read()
+    transcript_text = transcribe_audio(audio_bytes, file.filename or "audio.mp4")
+    results = check_content_conformance_from_transcript(kich_ban.get("cau", []), transcript_text)
+    return {"ketQua": results, "transcript": transcript_text}
 
 
 @app.post("/generate")
