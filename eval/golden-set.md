@@ -185,3 +185,37 @@ không sự kiện mới) xen giữa kịch bản đã validate xong ở lượt
 Test 2/2 lần: 7→12 câu và 7→13 câu, toàn bộ câu mới đúng chuẩn (không trích dẫn, không chữ số), toàn bộ
 câu gốc giữ nguyên. Bài học: tách trách nhiệm ra 2 lượt AI độc lập ổn định hơn nhiều so với dồn hết yêu
 cầu vào 1 prompt dài — đúng như dự đoán ở case 24.
+
+## Case 27 — chạy lại full 20 case với code mới nhất (chiều 17/9, trước CP4), phát hiện + vá 1 bug thật
+
+Viết script gọi thẳng `/generate` cho cả 20 case (thay vì làm tay qua UI) để chạy lại nhanh sau khi đã thêm
+Layer 6/7/8 + vá schema (case 25). Kết quả ở mức HTTP (qua/không qua validate, CHƯA chấm nội dung từng
+case theo đúng kỳ vọng — để lại làm tiếp trước CP6): **15/20 HTTP 200, case 20 đúng HTTP 400 (robustness),
+4/20 fail HTTP 502 (case 4, 6, 7, 16)**.
+
+**Bug thật phát hiện ngay ở case 1:** Layer 4b (mở rộng kiểm số ở `chuTrenManHinh` — thêm hôm nay) chấm
+oan câu dẫn nhập không trích dẫn ("Xin chào các bạn...") vì `chuTrenManHinh` của nó ghi "năm 2024" — đúng
+con số CHÍNH NGƯỜI DÙNG gõ trong mục tiêu, không phải AI bịa. Do câu này `nguon: []` (đúng, vì là câu chào
+không có sự thật cần chứng minh) nên không có "đoạn trích dẫn" nào để đối chiếu → bất kỳ số nào trong
+`chuTrenManHinh` của MỌI câu không trích dẫn đều tự động bị chấm là "bịa", kể cả khi chỉ lặp lại đúng dữ
+liệu người dùng tự nhập. Đây là ràng buộc không thể thoả mãn được (luôn fail), không phải AI sai.
+
+**Đã sửa:** `find_ungrounded_numbers()`/`validate_output()` nhận thêm `user_context_text` (ghép từ
+topic/goal/audience/duration), số nào trùng với chính input của người dùng thì không tính là bịa. Test
+lại case 1: HTTP 200, AI vẫn không bịa số % (đúng kỳ vọng case 1 — chỉ nói chung chung, không đưa ra %
+cụ thể). Fix không mở lại lỗ hổng cũ: số bịa thật (không trùng nguồn, không trùng input người dùng) vẫn bị
+chặn — xác nhận qua case 6 dưới đây.
+
+**4 case fail HTTP 502, soi nguyên nhân:**
+- **Case 6** (giá token rẻ nhất): AI đưa 2 con số cụ thể "5.2"/"5.6" không có trong slide — **Layer 4b
+  chặn đúng ý đồ case 6** (không được bịa giá cụ thể). Hệ thống hoạt động đúng thiết kế, chỉ là chặn cứng
+  bằng lỗi 502 thay vì có phản hồi mềm hơn cho người dùng cuối.
+- **Case 4, 7, 16:** cả 3 đều fail vì **Layer 7** (AI judge chấm trích dẫn không thực sự liên quan tới nội
+  dung nhưng vẫn tính vào `soNguonXacNhan`) — hành vi CHƯA từng xảy ra ở lượt 1 (lúc đó chưa có Layer 7).
+  Chưa xác định được đây là Layer 7 phát hiện đúng trích dẫn yếu thật, hay đang chấm gắt hơn mức cần thiết
+  ở các case này — cần đọc kỹ nội dung từng case để kết luận, **để lại làm tiếp trước CP6**.
+
+**Việc CHƯA làm xong (tự khai trung thực):** 15 case HTTP 200 mới dừng ở "qua được validate tự động", chưa
+đối chiếu nội dung với đúng kỳ vọng từng case (VD case 9 cần đúng mốc lịch sử, case 19 cần đúng độ sâu cho
+giảng viên) như cách chấm ở lượt 1 — cần 1 vòng đọc nội dung thủ công nữa trước khi có thể so % trực tiếp
+với lượt 1.
