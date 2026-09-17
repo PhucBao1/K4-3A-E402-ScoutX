@@ -412,7 +412,43 @@ def expand_script_with_analogy(kich_ban: dict, so_cau_con_thieu: int | None = No
             messages=[{"role": "user", "content": EXPAND_SCRIPT_PROMPT.format(
                 kich_ban_json=json.dumps(original_cau, ensure_ascii=False),
                 goi_y_so_luong=goi_y_so_luong)}],
-            response_format={"type": "json_object"},
+            # Structured Outputs (strict:true) thay vì "json_object" thường — ĐẢM BẢO CHẮC CHẮN
+            # đúng field/kiểu dữ liệu, không chỉ đúng cú pháp JSON. Phát hiện thật ở
+            # expand_script_to_target(): sau vài vòng gọi liên tiếp, model hay nhét lời đọc vào
+            # field "kieu" (enum) và bỏ trống "loi" — "json_object" không chặn được vì vẫn là JSON
+            # hợp lệ, chỉ sai Ý NGHĨA field. Ép enum cho "kieu" khiến model không còn chỗ để nhét
+            # nhầm câu chữ dài vào đó nữa (xem eval/golden-set.md case 31).
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "cau_mo_rong",
+                    "strict": True,
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "cauMoRong": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "n": {"type": "integer"},
+                                        "phan": {"type": "integer"},
+                                        "kieu": {"type": "string", "enum": ["ke", "giang", "nhe", "hoi", "nhan"]},
+                                        "loi": {"type": "string"},
+                                        "chuTrenManHinh": {"type": "string"},
+                                        "yDoHinh": {"type": "string"},
+                                        "nguon": {"type": "array", "items": {"type": "string"}},
+                                    },
+                                    "required": ["n", "phan", "kieu", "loi", "chuTrenManHinh", "yDoHinh", "nguon"],
+                                    "additionalProperties": False,
+                                },
+                            },
+                        },
+                        "required": ["cauMoRong"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
         )
         parsed = json.loads(resp.choices[0].message.content)
         expanded_cau = parsed.get("cauMoRong", [])

@@ -348,3 +348,33 @@ này nhiều vòng (`expand_script_to_target()`, endpoint mới `/expand-script-
 đã thống nhất từ case 24. Chấp nhận kịch bản ngắn hơn mục tiêu thật (14-20/34 câu) hơn là có câu hỏng dữ
 liệu lọt ra ngoài. Hướng chưa thử (để lại): đổi model bước expand sang model khác gpt-4o-mini để giảm lỗi
 schema, hoặc giới hạn cứng 2-3 câu/vòng thay vì để AI tự quyết số lượng mỗi lần.
+
+## Case 32 — thử Structured Outputs (json_schema strict) để sửa lỗi field ở Case 31
+
+Tìm được giải pháp thật cho nguyên nhân gốc ở case 31 (nhét lời đọc vào field "kieu"): OpenAI có tính năng
+**Structured Outputs** (`response_format: {"type": "json_schema", "strict": true, ...}`) — khác với
+`{"type": "json_object"}` đang dùng (chỉ đảm bảo JSON hợp lệ cú pháp), structured outputs ĐẢM BẢO CHẮC CHẮN
+đúng field/kiểu dữ liệu theo schema khai báo, ép `"kieu"` phải là 1 trong enum 5 giá trị hợp lệ — model
+không còn "chỗ" để nhét câu chữ dài vào field đó nữa. Đã đổi `expand_script_with_analogy()` sang dùng
+schema chặt này.
+
+**Kết quả test thật (6 lần gọi trực tiếp hàm thật + 3 lần gọi `/expand-script-full` end-to-end):**
+- **Lỗi field "kieu" ở case 31 KHÔNG còn xuất hiện lần nào** trong 6 lần test trực tiếp — structured
+  outputs giải quyết đúng triệt để nguyên nhân gốc đã xác định.
+- **NHƯNG phát hiện 1 lỗi khác vẫn tồn tại, không liên quan tới structured outputs:** ~1/3 số lần gọi,
+  Guard 1 (câu gốc phải còn NGUYÊN VĂN 100%) bị chặn — model đôi khi không tái tạo lại chính xác từng chữ
+  1 câu gốc (có thể lệch dấu câu/khoảng trắng nhỏ) dù không sửa Ý. Guard 1 dùng so khớp CHUỖI TUYỆT ĐỐI nên
+  chặn cả những lệch nhỏ không đáng kể — đây là thiết kế AN TOÀN có chủ đích (thà chặn nhầm còn hơn lọt câu
+  gốc bị sửa thật), nhưng khiến tỉ lệ "no-progress" ngay từ vòng 1 khá cao.
+- **3 lần chạy `/expand-script-full` end-to-end sau khi sửa:** lần 1: 5→5 câu (dừng ngay vòng 1, Guard 1
+  chặn) · lần 2: 5→**20 câu** (5 vòng, dừng vì no-progress ở vòng 6) · lần 3: 5→5 câu (dừng ngay vòng 1).
+  **2/3 lần THẤT BẠI HOÀN TOÀN ngay từ đầu**, 1/3 lần đạt kết quả tốt ngang bằng mức tốt nhất trước khi sửa
+  (20/34 = 59%). Kết luận trung thực: structured outputs sửa đúng 1 lỗi thật đã tìm ra, nhưng KHÔNG cải
+  thiện được độ ổn định tổng thể của việc đạt gần target 34 câu — nút thắt thật nằm ở khả năng model tái
+  tạo verbatim câu dài + đồng thời sinh nội dung mới, không phải ở cấu trúc JSON.
+
+**Quyết định:** giữ nguyên Guard 1 chặt (không nới lỏng so khớp chuỗi) — đúng nguyên tắc an toàn xuyên suốt
+dự án. Việc "kịch bản thật sự đủ 4 phút" với gpt-4o-mini + kiến trúc lặp hiện tại vẫn CHƯA giải quyết được
+ổn định — để lại làm tiếp (hướng khả thi chưa thử: model mạnh hơn cho riêng bước expand, hoặc nới Guard 1
+sang so khớp sau khi chuẩn hoá khoảng trắng/dấu câu thay vì so chuỗi tuyệt đối — cần cân nhắc kỹ vì đây là
+lớp bảo vệ "không sửa câu gốc", nới lỏng sai cách có thể mở lỗ hổng thật).
