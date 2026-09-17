@@ -373,7 +373,18 @@ RÀNG BUỘC KỸ THUẬT (vi phạm sẽ bị huỷ, dùng bản mẫu an toàn
 - Chỉ trả về NỘI DUNG BÊN TRONG thẻ #root (các thẻ div/p/h1/svg...), KHÔNG trả về <html>/<head>/<body>/<script>.
 - Mọi phần tử có hoạt ảnh timing phải có class="clip" data-start="0" data-duration="{duration}".
 - Toạ độ phải nằm trong khung 1920x1080 (dùng position:absolute với left/top/width/height hợp lý, chừa lề
-  ít nhất 96px mỗi cạnh).
+  ít nhất 96px mỗi cạnh). Vùng an toàn để đặt nội dung là 1728x888 (1920-96*2 x 1080-96*2) — TÍNH TOÁN kích
+  thước/khoảng cách dựa trên vùng an toàn này, không đặt cứng 1 độ rộng/khoảng cách cố định rồi hy vọng vừa.
+- DÃY PHẦN TỬ LẶP LẠI SỐ LƯỢNG ĐỘNG (mốc thời gian, bước, chi tiết...): nếu có nhiều hơn 4 phần tử, KHÔNG
+  vẽ hết toàn bộ — chỉ vẽ 3 phần tử đầu rồi thêm 1 phần tử "..." rồi tới phần tử CUỐI CÙNG (mẫu: "1, 2, 3,
+  ..., n"), để không bao giờ tràn ra ngoài vùng an toàn dù số lượng thực tế bao nhiêu. Nếu ≤4 phần tử, chia
+  đều chiều rộng bằng % hoặc calc(), không dùng width cố định theo px cho từng ô.
+- KHÔNG BAO GIỜ đặt text (nhãn/label) đè lên đúng vị trí 1 đường kẻ/viền (line/border) — nếu có đường kẻ đi
+  ngang qua khu vực có chữ, dịch chữ lệch hẳn lên trên hoặc xuống dưới đường kẻ đó tối thiểu bằng chiều cao
+  dòng chữ, không để đường kẻ cắt ngang giữa dòng chữ.
+- Sơ đồ minh hoạ phải LẤP ĐẦY hợp lý vùng an toàn (không vẽ 1 hình nhỏ lọt thỏm giữa khoảng trống mênh
+  mông) — nếu cảnh chỉ có 1 sơ đồ nhỏ, phóng to kích thước hoặc căn giữa cả theo chiều ngang lẫn dọc của
+  vùng an toàn, không dồn về 1 góc/cạnh để trống phần lớn còn lại.
 - Text tiêu đề và phụ đề ở trên PHẢI xuất hiện nguyên văn đâu đó trong HTML (không đổi chữ, không bịa thêm
   chữ mới ngoài 2 câu đó và các nhãn/số liệu đã có sẵn trong câu).
 - KHÔNG dùng Math.random(), Date.now(), fetch, hay bất kỳ nguồn ngẫu nhiên/không xác định nào.
