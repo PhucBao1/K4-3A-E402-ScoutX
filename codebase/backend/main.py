@@ -134,7 +134,9 @@ def find_ungrounded_numbers(data: dict, source_text: str) -> list[str]:
     for t in ho_so.get("thongTin", []):
         for bc in t.get("bangChung", []):
             raw = bc.get("doanTrich", "") or ""
-            is_web = source_loai_by_id.get(bc.get("nguonId")) == "web"
+            # "loai" giờ chi tiết hơn ("tai-lieu-chinh-thuc"/"bai-bao-khoa-hoc"/"bao-chi"/
+            # "blog-ca-nhan" thay vì chỉ "web") — bất kỳ giá trị nào KHÁC "slide" đều là nguồn mạng
+            is_web = source_loai_by_id.get(bc.get("nguonId")) not in (None, "slide")
             if not NUMBER_PATTERN.search(raw) and not is_web:
                 continue  # không có số, và không phải nguồn web → rủi ro thấp, không bắt buộc khớp tuyệt đối
             doan_trich = _normalize_ws(LEAD_IN_PREFIX.sub("", raw))

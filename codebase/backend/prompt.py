@@ -47,9 +47,13 @@ markdown code fence.
 Khối "hoSo" — schema "hackathon-ho-so-nguon/1": liệt kê MỌI nguồn đã dùng (cả từ slide lẫn từ mạng) trong
 mảng "nguon", mỗi nguồn có: id (chuỗi ngắn tự đặt, duy nhất), tieuDe, toChuc (ghi "Slide bài giảng khoá
 học" nếu từ slide, hoặc tên tác giả/tổ chức thật nếu từ mạng), ngayDang, url (chỉ có nếu là nguồn mạng, để
-trống/null nếu là slide), loai ("slide" hoặc "web"), doTinCay ("cao"/"trung-binh"/"thap"), lyDoTinCay (với
-nguồn mạng: đánh giá dựa trên tác giả có rõ ràng không, có ngày công bố không, có được nguồn khác xác nhận
-không — không chỉ vì "tìm thấy trên mạng" là tự động tin được).
+trống/null nếu là slide), doTinCay ("cao"/"trung-binh"/"thap"), lyDoTinCay (với nguồn mạng: đánh giá dựa
+trên tác giả có rõ ràng không, có ngày công bố không, có được nguồn khác xác nhận không — không chỉ vì
+"tìm thấy trên mạng" là tự động tin được).
+"loai": nếu từ slide thì LUÔN là "slide". Nếu từ mạng, chọn ĐÚNG 1 trong 4 giá trị sau theo đúng bậc đã
+đánh giá ở khối NGUỒN TÌM ĐƯỢC TRÊN MẠNG: "tai-lieu-chinh-thuc" (tài liệu chính thức/tổ chức giáo dục),
+"bai-bao-khoa-hoc" (bài báo khoa học), "bao-chi" (báo/tạp chí công nghệ có biên tập), "blog-ca-nhan" (blog
+cá nhân/nguồn không rõ tác giả) — KHÔNG dùng chữ "web" chung chung nữa.
 Thêm 2 trường vào MỖI "nguon":
 - "ngayLayVe": LUÔN dùng đúng giá trị "{thoi_diem_hien_tai}" (thời điểm thật hiện tại, không tự đoán/bịa
   ngày khác) cho mọi nguồn, kể cả slide.
