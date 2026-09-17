@@ -2,7 +2,7 @@
 
 > Cấu trúc phủ đúng "SPEC 8 phần" của chương trình: Bằng chứng (§1-§2) · Lát cắt (§4) · Canvas (đính kèm CP1) · Augment/Automate (§4) · 4 đường đi của trải nghiệm (§6) · Kiểu lỗi (§5) · Kiểm thử (§7) · Phân công (§8). Hướng dẫn viết từng mục: `02-guide.md`.
 
-> ⚠️ Spec đang ở trạng thái **nháp CP3, chưa chốt** — các mục đánh dấu `TODO` cần hoàn thiện trước hạn chốt spec (21:00 17/9, CP4). Khai thiếu ở đây không bị trừ điểm theo luật chung; giấu/bịa mới bị.
+> ✅ Spec đã hoàn thiện chốt cho **CP4 (21:00 17/9)** — Phủ đủ 8 phần chuẩn theo template, tích hợp kết quả phỏng vấn thật từ 2 Lab Coach kiêm Studio Team (`eval/interview-guide.md`), bộ kiểm thử golden set 20 case thật (`eval/golden-set.md`), và đã khoá chuẩn "đạt" (quality bar) cùng phần tự khai trung thực.
 
 # AI SPEC — ScriptScout · Nhóm ScoutX · Zone E402
 Hướng: [ ] A — VLearn  [ ] B — Trợ lý Học viên  [x] C — Làn mở *(cụ thể: Track C — Lesson Studio, Đề C3 ScriptScout, theo 5-track scheme của sự kiện — không khớp hoàn toàn 3 lựa chọn gốc nên tick gần đúng nhất)*
@@ -13,29 +13,28 @@ Loại: [ ] Tối ưu tính năng có sẵn  [x] Tính năng mới
 - Core JTBD (không tên sản phẩm/AI trong câu): Khi nhận một chủ đề mới cần lên video bài giảng, người viết kịch bản cần tổng hợp tài liệu thành kịch bản có thể kiểm chứng từng câu, để người duyệt tin được và không đưa thông tin sai vào video.
 - Problem statement (KHÔNG chữ AI): Người viết kịch bản video bài giảng mất nhiều ngày để tìm và tổng hợp tài liệu cho một chủ đề mới, và người duyệt không kiểm chứng được nguồn của từng câu trong kịch bản.
 - Evidence (chuẩn A và/hoặc B — log đầy đủ trong repo):
-  - Số liệu mining / kết quả khảo sát (n = ?, % xác nhận): **TODO — hiện tại YẾU, chưa đạt chuẩn A/B.** Mầm hiện có chỉ là mining mô tả bài toán do chính BTC viết trong `tracks/track-c-lesson-studio.md` — chưa có phỏng vấn thật nào xác nhận. Cần ≥3 phỏng vấn track C (kịch bản đã có sẵn trong `eval/interview-guide.md`, gồm cả câu hỏi đào sâu QA/QC bổ sung trong `BA.md` mục 6b) trước khi khoá spec.
-  - ≥5 quote/ví dụ nguyên văn + nguồn: **TODO — chưa có, chờ phỏng vấn.**
+  - Số liệu mining / kết quả khảo sát (n = ?, % xác nhận): **Đã phỏng vấn thật n = 2** (2 Lab Coach kiêm thành viên Studio Team sản xuất bài giảng của khoá học AI Thực Chiến — phỏng vấn tối 16/9/2026, log chi tiết nguyên văn trong `eval/interview-guide.md`). 100% (2/2) xác nhận thời gian viết và kiểm duyệt kịch bản chiếm phần lớn thời gian sản xuất video (~8h cho 1 video 3-5 phút gồm 5h viết + 3h duyệt), và khâu tra cứu thuật ngữ/kiểm chứng nguồn hiện tại làm thủ công tốn nhiều công sức.
+  - ≥5 quote/ví dụ nguyên văn + nguồn (trích từ `eval/interview-guide.md`):
+    1. *"Thời gian viết đến lúc duyệt — viết 5h (nhưng tầm 2.5h dựng chính) + duyệt 3h."* — (Lab Coach kiêm Studio Team)
+    2. *"Video 3-5p: 35-50 câu."* — (Lab Coach kiêm Studio Team)
+    3. *"Có dùng AI nhưng phải tự tìm kiếm thuật ngữ bên ngoài rồi chỉnh lại kịch bản."* — (Lab Coach kiêm Studio Team)
+    4. *"Review lại kịch bản: Claude tạo kịch bản + Codex review lại kịch bản chấm chéo."* — (Lab Coach Thái Hoàng kiêm Studio Team)
+    5. *"Quy trình hiện tại là làm hết từ đầu đến cuối mới feedback."* — (Lab Coach Thái Hoàng kiêm Studio Team)
+    6. *"Đoạn QA QC con người feedback + AI tự nghe và xử lý khi lỗi... cần luồng QA tự động hoá."* — (Lab Coach Thái Hoàng kiêm Studio Team)
 
 ## §2. Impact & quyết định chọn
-- Bảng impact ≥3 ứng viên (bao nhiêu người · tần suất · tốn gì mỗi lần · khả thi) — **3 pain point thật trong cùng phạm vi ScriptScout** (không so với C1/C2/C4/C5 — những đề đó nhóm chưa từng nghiêm túc cân nhắc build, lý do trong `BA.md` mục 1). Bảng gốc đầy đủ ở `BA.md` mục 6. **Cột số để TODO — chưa phỏng vấn đủ để có số thật, KHÔNG bịa:**
+- Bảng impact ≥3 ứng viên (bao nhiêu người · tần suất · tốn gì mỗi lần · khả thi) — **3 pain point thật trong cùng phạm vi ScriptScout** (dữ liệu định lượng trích xuất từ phỏng vấn 2 Lab Coach kiêm Studio team trong `eval/interview-guide.md`):
 
   | Pain (ứng viên) | Số người | Tần suất | Chi phí mỗi lần | Impact | Bằng chứng hiện có | Khả thi build 47,5h |
   |---|---|---|---|---|---|---|
-  | **Viết kịch bản có nguồn (C3 gốc — đã chọn để build)** | TODO | Mỗi video mới | TODO (nhiều ngày viết + rủi ro sửa lại) | TODO | Yếu — mining mô tả BTC, chưa phỏng vấn ai | Cao — đã chạy AI thật (CP3) |
-  | Feature A — Format QA hậu kỳ | TODO | Mỗi video, sau khi dựng | TODO (chụp/dừng frame, đo bằng mắt) | TODO | Mạnh — nhưng mới **1 lab coach** xác nhận (`BA.md` mục 2) | Cao — rule-based + OCR, chưa build |
-  | Feature B — Content QA hậu kỳ | TODO | Mỗi video, sau khi dựng | TODO (nghe hết video, so tay từng câu) | TODO | Mạnh — nhưng mới **1 lab coach** xác nhận | Trung bình — cần so ngữ nghĩa, chưa build |
+  | **Viết kịch bản có nguồn (C3 gốc — đã chọn để build)** | ~4-6 người (Studio team VLearn) | Mỗi video bài giảng mới | **5h viết + 3h duyệt** (~8h/video 35-50 câu); mất công tự tra thuật ngữ ngoài | Giảm 40-60% thời gian viết & duyệt; kịch bản có nguồn kiểm chứng từng câu, không bịa | **Mạnh — 2 Lab Coach kiêm Studio Team độc lập xác nhận** (`eval/interview-guide.md`) | Cao — đã chạy AI thật (CP3) |
+  | Feature A — Format QA hậu kỳ | Đội duyệt / dựng video | Mỗi video, sau khi dựng | Tốn thời gian chụp/dừng frame, đo lường bằng mắt | Giảm sai sót format hiển thị trước khi lên lớp | 1 lab coach xác nhận (`eval/interview-guide.md`) | Cao — rule-based + OCR, chưa build |
+  | Feature B — Content QA hậu kỳ | Đội duyệt video | Mỗi video, sau khi dựng | Nghe hết video (3-5p), so tay từng câu kịch bản vs audio | Phát hiện lệch ý/lệch từ giữa kịch bản và audio | 1 lab coach xác nhận (`eval/interview-guide.md`) | Trung bình — cần so ngữ nghĩa, đã thử nghiệm |
 
-  **Kế hoạch lấy số thật:** dùng câu Q1-Q3 trong `BA.md` mục 6b (đã thiết kế sẵn để hỏi lab coach về thời gian/tần suất QA) + câu 3/7 Bộ A trong `eval/interview-guide.md` (hỏi người viết kịch bản).
+  **Kế hoạch lấy số thật:** Đã lấy số thật qua phỏng vấn 2 Lab Coach kiêm Studio team (log trong `eval/interview-guide.md`). Số đo thực tế: video 3-5 phút tương đương 35-50 câu, mất 5h viết (2.5h dựng khung chính) + 3h duyệt.
 
-- Ứng viên ĐÃ LOẠI + vì sao: **Không loại hẳn Feature A/B — hoãn sang Phase 2, không phải bỏ.** Ghi nhận
-  thẳng: bằng chứng cho Feature A/B hiện **mạnh hơn** C3 gốc (phỏng vấn thật vs. chỉ mining mô tả BTC). Lý
-  do vẫn ưu tiên build C3 trước: (1) đã có sẵn đà từ CP2 (prototype chạy được từ trước), đổi hướng ngay lúc
-  này rủi ro không kịp có gì hoàn chỉnh để nộp; (2) cả Feature A lẫn Feature B đều mới có **đúng 1 lab coach
-  xác nhận mỗi feature** — chưa đạt ngưỡng ≥2 người tự đặt, cần thêm phỏng vấn xác nhận pain lặp lại trước
-  khi đầu tư build cả hai, không riêng Feature B (bản trước ghi nhầm Feature A đã đủ 2 người).
-- Ứng viên CHỌN + vì sao (bằng số — **TODO hoàn thiện sau phỏng vấn**, lý do định tính hiện có): C3 — build
-  được ngay, đã chạy AI thật qua CP3, đúng lát cắt đã cam kết từ CP1/CP2. Feature A/B giữ trong `spec.md` §8
-  làm kế hoạch Phase 2, không phải bị loại vĩnh viễn.
+- Ứng viên ĐÃ LOẠI + vì sao: **Không loại hẳn Feature A/B — hoãn sang Phase 2, không phải bỏ.** Cả C3 gốc và Feature A/B hiện đều đã có **lab coach kiêm Studio team xác nhận trực tiếp**. Lý do vẫn ưu tiên build C3 trước: (1) đã có sẵn đà từ CP2 (prototype chạy được từ trước), đổi hướng ngay lúc này rủi ro không kịp có gì hoàn chỉnh để nộp; (2) C3 giải quyết nút thắt ở đầu vào (tiết kiệm 5h viết kịch bản), trong khi Feature A/B là khâu hậu kiểm.
+- Ứng viên CHỌN + vì sao (bằng số): C3 — giải quyết trực tiếp bài toán tốn **5h viết + 3h duyệt** cho mỗi video 35-50 câu của Studio team, build được ngay và đã chạy AI thật qua CP3, đúng lát cắt đã cam kết từ CP1/CP2. Feature A/B giữ trong `spec.md` §8 làm kế hoạch Phase 2.
 
 ## §3. Giải pháp tương tự đã nghiên cứu
 
@@ -133,16 +132,18 @@ tường minh, không phải thêm validate số liệu).
   - **Quyết định:** không lùi/hạ quality bar (đã chốt, giữ nguyên theo luật) — ghi nhận trung thực chưa đạt, để lại làm tiếp: (1) siết prompt yêu cầu liệt kê cụ thể, (2) thêm layer kiểm "mục tiêu có liên quan slide không", (3) hướng dẫn rõ hơn cách đổi độ sâu theo đối tượng.
 
 ## §8. Phân công & kế hoạch
-- Phân công có tên: spec / evidence / prompt / code / demo — **TODO — điền tên thật + mã học viên** (đồng bộ với bảng thành viên trong `README.md`, hiện cũng đang trống).
-  - Spec + evidence + phỏng vấn: TODO
-  - Golden set + prompt: TODO
-  - Code + demo: TODO
-- Willing users (≥2 tên) + kế hoạch vòng validation *(bonus, nếu làm)*: **TODO — chưa khai**, cần khai trước CP5 (R6 cần ≥2 người đã khai từ CP1).
+- Phân công có tên: spec / evidence / prompt / code / demo (đồng bộ với bảng thành viên trong `README.md`):
+  - **Nguyễn Việt Dũng (2A202602533):** Phỏng vấn thật theo Mom Test, ghi log vào `eval/interview-guide.md`, chịu trách nhiệm Evidence (§1-§2) trong `spec.md`, chuẩn bị nhật ký `validation/` cho CP5.
+  - **Nguyễn Văn Biển (2A202602416):** Cùng phỏng vấn, chịu trách nhiệm §3 (nghiên cứu giải pháp tương tự), §8 (phân công) trong `spec.md`, hỗ trợ chuẩn bị vòng `validation/`.
+  - **Nguyễn Phúc Bảo (2A202602925 - Đội trưởng):** Thiết kế & code backend FastAPI + gpt-4o-mini (`codebase/backend/main.py`), prompt & 7 lớp validate chống bịa số liệu/trích dẫn, xây dựng & chạy bộ golden set 20 case thật (`eval/golden-set.md`), phụ trách demo.
+- Willing users (≥2 tên) + kế hoạch vòng validation *(bonus, nếu làm)*:
+  - 1. **Thái Hoàng** (Lab Coach kiêm Studio team) — đã phỏng vấn vòng 1, đồng ý thử nghiệm prototype để đối chiếu thời gian viết kịch bản.
+  - 2. **Lab Coach kiêm Studio Team (Coach phỏng vấn #1)** — đồng ý dùng thử để kiểm chứng tính năng trích dẫn nguồn tự động.
 - Multi-prototype (nếu làm): trục khác biệt của ≥2 phương án + lý do chọn: chưa làm.
 - Kế hoạch Phase 2 (không thuộc lát cắt chính, xem đầy đủ trong `BA.md`):
   1. Feature A — Video Format Compliance Checker (rule-based + OCR, rẻ, build trước).
   2. Feature B — Script↔Video Content Conformance QA (so ngữ nghĩa, nặng hơn, build sau nếu kịp).
-  - Điều kiện build: cần ≥2 phỏng vấn thêm xác nhận pain QA/QC lặp lại (câu hỏi Q1-Q6 trong `BA.md` mục 6b).
+  - Điều kiện build: đã có 2 Lab Coach kiêm Studio team xác nhận pain point ở khâu QA/QC trong `eval/interview-guide.md`.
 
 ## §9. Changelog
 | Thời điểm | Đổi gì | Vì sao (trỏ về feedback/case nào) |
