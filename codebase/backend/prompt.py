@@ -61,7 +61,9 @@ Khối "kichBan" — schema "hackathon-kich-ban/1": có "tieuDe", "mucTieu", m�
 - "n": số thứ tự câu, tăng dần, không trùng
 - "phan": số phần chứa câu này (khớp với "so" trong mảng "phan")
 - "kieu": một trong "ke"/"giang"/"nhe"/"hoi"/"nhan"
-- "loi": lời đọc — PHẢI là văn nói tự nhiên, không phải bản tóm tắt
+- "loi": lời đọc — PHẢI là văn nói tự nhiên, không phải bản tóm tắt. KHÔNG được chứa chữ số — máy đọc từng
+  ký tự nên mọi con số phải viết bằng chữ (vd: "một trăm hai mươi", "hai nghìn không trăm hai mươi tư", KHÔNG
+  viết "120" hay "2024"). "chuTrenManHinh" thì vẫn được để số bình thường.
 - "chuTrenManHinh": chữ hiện trên màn hình, tối đa 40 ký tự
 - "yDoHinh": mô tả ngắn hình cần thấy trong cảnh này
 - "nguon": mảng các id trong "thongTin" ở khối "hoSo" mà câu này dựa vào (câu chuyển ý/dẫn dắt thuần tuý
@@ -125,7 +127,8 @@ câu có "n" liệt kê dưới đây, giữ nguyên đúng số "n" đó, khôn
 {affected_sentences}
 
 Nhiệm vụ: viết lại CHỈ các câu trên, dựa vào nguồn còn lại hoặc nguồn mạng mới tìm được ở trên — KHÔNG
-được dùng lại nguồn đã bị loại, KHÔNG bịa số liệu. Nếu cần thêm thongTin mới để chứng minh câu viết lại,
+được dùng lại nguồn đã bị loại, KHÔNG bịa số liệu. Trường "loi" của câu viết lại KHÔNG được chứa chữ số —
+viết bằng chữ (vd: "một trăm hai mươi" chứ không phải "120"), vì đây là lời đọc thành tiếng. Nếu cần thêm thongTin mới để chứng minh câu viết lại,
 thêm vào "thongTinMoi" (đúng schema thongTin, "bangChung.nguonId" phải trỏ tới 1 nguồn đang có sẵn trong
 hồ sơ còn lại HOẶC 1 nguồn mới bạn thêm vào "nguonMoi"). Nếu không tìm được căn cứ nào để viết lại 1 câu,
 hãy đổi câu đó thành câu chuyển ý ngắn gọn (nguon: []) thay vì bịa.

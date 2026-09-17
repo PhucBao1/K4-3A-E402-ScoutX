@@ -229,6 +229,14 @@ def validate_output(data: dict, source_text: str) -> None:
                 f"{len(distinct_sources)} nguồn độc lập thật sự trong bangChung — có thể khai khống mức xác minh"
             )
 
+    # Layer 6 — "loi" (lời đọc) không được chứa chữ số, theo đúng mau-kich-ban.md của BTC
+    # ("Không có chữ số" — máy đọc từng ký tự, số phải viết bằng chữ). "chuTrenManHinh" không bị
+    # ràng buộc này.
+    for cau in kich_ban.get("cau", []):
+        loi = cau.get("loi")
+        if loi and re.search(r"\d", loi):
+            raise ValueError(f"Câu {cau.get('n')} có chữ số trong 'loi' (phải viết bằng chữ): {loi!r}")
+
 
 @app.post("/generate")
 async def generate(
