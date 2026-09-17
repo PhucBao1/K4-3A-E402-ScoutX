@@ -385,6 +385,12 @@ RÀNG BUỘC KỸ THUẬT (vi phạm sẽ bị huỷ, dùng bản mẫu an toàn
   vẽ hết toàn bộ — chỉ vẽ 3 phần tử đầu rồi thêm 1 phần tử "..." rồi tới phần tử CUỐI CÙNG (mẫu: "1, 2, 3,
   ..., n"), để không bao giờ tràn ra ngoài vùng vẽ dù số lượng thực tế bao nhiêu. Nếu ≤4 phần tử, chia đều
   chiều rộng bằng % hoặc calc(), không dùng width cố định theo px cho từng ô.
+- MỌI Ô/NHÃN/KHỐI (trừ riêng đường nối/mũi tên) PHẢI có "trọng lượng thị giác" — nền thẻ đặc
+  `background: #16161F` HOẶC viền dày `border: 2px solid #58C4DD`, bo góc `border-radius: 8-12px`,
+  padding tối thiểu 16-20px. TUYỆT ĐỐI KHÔNG đặt chữ trần nổi trực tiếp trên nền đen không có gì bao quanh —
+  nhìn trống trải, thiếu chuyên nghiệp. Mỗi thẻ/ô tối thiểu rộng 160px, cao 56px (trừ nhãn nhỏ đi kèm sát 1
+  đường/mũi tên). Ưu tiên bố cục dạng thẻ/card như 1 dashboard thật (giống ví dụ: khối "Encoder Block" có
+  nền tối, viền, danh sách nhãn con bên trong mỗi nhãn cũng có nền riêng) hơn là vẽ đường/hình học trần.
 - KHÔNG BAO GIỜ đặt text (nhãn/label) đè lên đúng vị trí 1 đường kẻ/viền (line/border) — nếu có đường kẻ đi
   ngang qua khu vực có chữ, dịch chữ lệch hẳn lên trên hoặc xuống dưới đường kẻ đó tối thiểu bằng chiều cao
   dòng chữ, không để đường kẻ cắt ngang giữa dòng chữ.
