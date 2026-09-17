@@ -16,6 +16,7 @@ from render_video import render as render_video_to_mp4
 from prompt import (
     JUDGE_RELEVANCE_PROMPT,
     PROMPT_TEMPLATE,
+    QA_CONTENT_PROMPT,
     RETRY_SUFFIX,
     REWRITE_PROMPT_TEMPLATE,
     REWRITE_RETRY_SUFFIX,
@@ -308,6 +309,44 @@ def check_citation_relevance(data: dict) -> list[str]:
                 f"dung '{t.get('noiDung', '')[:50]}...'"
             )
     return problems
+
+
+def check_content_conformance(pairs: list[dict]) -> list[dict]:
+    """Feature B — Script<->Video Content Conformance QA (BA.md mục 5, build trước điều kiện tự
+    đặt theo quyết định có chủ đích 17/9 trưa — xem BA.md). So ngữ nghĩa "loiGoc" (kịch bản đã
+    duyệt) với "loiTrongVideo" (lời thực tế trong video đã dựng), gắn nhãn khớp/lệch nhẹ/lệch nội
+    dung. Chỉ gọi AI cho cặp THỰC SỰ khác nhau — so string trước để đỡ tốn phí cho câu giống hệt."""
+    results_by_n: dict[int, dict] = {}
+    to_check = []
+    for p in pairs:
+        if _normalize_ws(p["loiGoc"]) == _normalize_ws(p["loiTrongVideo"]):
+            results_by_n[p["n"]] = {
+                "n": p["n"], "nhan": "khop", "mucNghiemTrong": "thap", "giaiThich": "Giống hệt bản duyệt",
+            }
+        else:
+            to_check.append(p)
+
+    if to_check:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": QA_CONTENT_PROMPT.format(
+                pairs_json=json.dumps(to_check, ensure_ascii=False))}],
+            response_format={"type": "json_object"},
+        )
+        parsed = json.loads(resp.choices[0].message.content)
+        for r in parsed.get("ketQua", []):
+            results_by_n[r["n"]] = r
+
+    return [results_by_n.get(p["n"], {
+        "n": p["n"], "nhan": "loi", "mucNghiemTrong": "khong-ro", "giaiThich": "Không chấm được",
+    }) for p in pairs]
+
+
+@app.post("/qa-content")
+async def qa_content_endpoint(pairs_json: str = Form(...)):
+    """pairs_json: JSON list [{"n": 1, "loiGoc": "...", "loiTrongVideo": "..."}, ...]"""
+    pairs = json.loads(pairs_json)
+    return {"ketQua": check_content_conformance(pairs)}
 
 
 @app.post("/generate")

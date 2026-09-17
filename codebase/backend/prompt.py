@@ -189,3 +189,23 @@ Trả về ĐÚNG JSON, không thêm chữ nào khác:
 Chỉ liệt kê cặp KHÔNG thực sự liên quan/không xác nhận đúng nội dung. Nếu tất cả đều liên quan thật, trả
 về {{"khongLienQuan": []}}.
 """
+
+QA_CONTENT_PROMPT = """Bạn là người kiểm tra nội dung video bài giảng đã dựng so với kịch bản đã duyệt
+(Feature B — Script↔Video Content Conformance QA, đúng "chỗ khó nhất" đề C3: câu bị đọc lệch nội dung
+phải bị phát hiện, không được bỏ lọt).
+
+Với mỗi cặp câu dưới đây: "loiGoc" là lời ĐÃ DUYỆT trong kịch bản gốc; "loiTrongVideo" là lời THỰC TẾ xuất
+hiện trong video đã dựng (người đọc có thể diễn đạt khác, đọc nhầm, hoặc vô tình đổi số liệu/tên riêng).
+
+So sánh NGỮ NGHĨA (không so chữ tuyệt đối) và gắn ĐÚNG 1 trong 3 nhãn:
+- "khop": ý giữ nguyên hệt, chỉ khác cách diễn đạt bình thường (từ đồng nghĩa, đảo thứ tự) hoặc giống hệt.
+- "lech-nhe": diễn đạt khác nhiều hơn nhưng Ý CHÍNH vẫn giữ nguyên, KHÔNG đổi số liệu/tên riêng/kết luận.
+- "lech-noi-dung": số liệu, tên riêng, hoặc ý/kết luận đã ĐỔI KHÁC so với bản duyệt — lỗi nghiêm trọng
+  nhất, học viên sẽ học sai kiến thức nếu lọt qua.
+
+Danh sách cặp cần chấm (JSON):
+{pairs_json}
+
+Trả về ĐÚNG JSON, không thêm chữ nào khác:
+{{"ketQua": [{{"n": <số câu>, "nhan": "khop"|"lech-nhe"|"lech-noi-dung", "mucNghiemTrong": "thap"|"trung-binh"|"cao", "giaiThich": "<1 câu ngắn, cụ thể chỗ nào khác nếu có>"}}, ...]}}
+"""
