@@ -271,3 +271,27 @@ prompt dài mà không còn tác dụng, theo đúng bài học "prompt càng d�
 Test lại: case 5 → HTTP 400, chặn đúng và NHANH (dưới 3 giây, vì chặn trước khi tốn công web-search + gọi
 AI chính) thay vì để AI viết xong rồi mới validate fail như trước. Test không phá case đúng phạm vi: case 1
 (AI trong sản xuất) vẫn chạy bình thường.
+
+**Tổng sau case 28 (test lại case 1,4,6,7,16 trước khi sửa tiếp): 10/20 đạt đầy đủ (50%) · 6/20 một phần ·
+4/20 fail (4, 6, 18, 19)** — cải thiện từ 40% lên 50%, ~65% nếu tính một phần=nửa điểm (bằng lượt 1).
+
+## Case 29 — vá thêm 2 gap nội dung: thiếu ý khi liệt kê nhiều mục, chưa đúng độ sâu/giải nghĩa thuật ngữ
+
+**Gap 1 — bỏ sót mục khi slide liệt kê nhiều khái niệm cùng loại (case 8: thiếu "Deep Learning" trong chuỗi
+AI⊃ML⊃DL⊃GenAI⊃LLM):** thêm đoạn "ĐẦY ĐỦ Ý" vào `PROMPT_TEMPLATE` — nếu 1 trang liệt kê nhiều mục riêng
+biệt cùng loại, phải trích đủ từng mục thành 1 `thongTin` riêng, không gộp/lược bớt. Test lại case 8: giờ
+liệt kê đủ cả 5 khái niệm đúng thứ tự lồng nhau — **fix thành công**. Test không phá case 1/17 (vẫn đúng,
+không bị ép dài ra).
+**Đánh đổi phát hiện được:** case 9 (ít mốc lịch sử trên slide) sau khi thêm hướng dẫn này thử thêm mốc
+"1950" không có nguồn thật → bị Layer 4b chặn đúng (502). Không phải regression mới (case 9 vốn đã yếu từ
+trước, giới hạn bởi slide chỉ có ~5-7 sự kiện) — nhưng cho thấy "đầy đủ ý" có thể đẩy AI overreach khi nguồn
+gốc quá ít, cần theo dõi thêm nếu dùng slide khác giàu nội dung hơn.
+
+**Gap 2 — chưa đúng độ sâu theo đối tượng chuyên môn (case 19) + chưa giải nghĩa tiếng Việt cho thuật ngữ
+tiếng Anh lần nhắc đầu (case 18):** thêm đoạn "ĐÚNG ĐỘ SÂU THEO ĐỐI TƯỢNG" vào `PROMPT_TEMPLATE`. Test lại:
+- Case 18: **fix thành công** — câu 1 giờ có "khung PAIR, tức là khung nghiên cứu Con người và AI của
+  Google" ngay lần nhắc đầu, đúng luật.
+- Case 19: **cải thiện nhưng chưa triệt để** — `hoSo.thongTin` giờ khai thác sâu hơn hẳn (thêm cơ chế
+  attention, phân bố xác suất token cụ thể từ slide) nhưng phần `kichBan.cau` (lời đọc thật) vẫn chưa thuật
+  lại các chi tiết kỹ thuật đó, còn khá chung chung — cần thêm 1 vòng nữa (chưa làm, để lại) nhắc rõ hơn
+  "phải ĐƯA VÀO LỜI ĐỌC, không chỉ trích dẫn suông" nếu muốn giải quyết triệt để.
