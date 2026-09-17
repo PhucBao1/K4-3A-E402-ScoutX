@@ -148,3 +148,30 @@ quy tắc khác. Đã rollback về bản ổn định trước đó ngay khi ph
 có trích dẫn chắc chắn đúng (như hiện tại), lượt 2 lấy kịch bản đó làm input CỐ ĐỊNH và chỉ thêm câu diễn
 giải/ví dụ minh hoạ xen kẽ (không được sửa câu gốc) — tách trách nhiệm sẽ ổn định hơn nhồi tất cả vào 1
 prompt.
+
+## Case 25 — đối chiếu schema `hoSo` với ví dụ chính thức của BTC, và 1 bug kiến trúc mới phát hiện ở `/rewrite`
+
+Đọc kỹ `data/studio-pack/c3-scriptscout/vi-du/ho-so-nguon-mau.json` (ví dụ chính thức) phát hiện 4 trường
+mình chưa làm đúng/chưa có, đã vá cả 4:
+
+1. **`ngayLayVe`** (thời điểm lấy nguồn) — chưa có → đã thêm, ban đầu AI tự bịa ngày sai (2023), đã sửa
+   bằng cách truyền thẳng giờ hệ thống thật vào prompt thay vì để AI tự đoán.
+2. **`canhBao`** (cảnh báo nguồn cũ/lỗi thời) — chưa có → đã thêm field, nhưng AI áp dụng KHÔNG đều (test
+   với chủ đề "Chi phí mô hình ngôn ngữ" — đúng chủ đề BTC thiết kế để test việc này theo
+   `chu-de-goi-y.md` — vẫn ra `canhBao: []` dù nguồn cũ). Ghi nhận như 1 soft-compliance gap, giống
+   hành vi đối chiếu chéo đa nguồn đã ghi nhận trước đó.
+3. **`loai` chi tiết** (`tai-lieu-chinh-thuc`/`bai-bao-khoa-hoc`/`bao-chi`/`blog-ca-nhan` thay vì chỉ
+   "web") — đã sửa, frontend hoá ra đã sẵn sàng nhận các giá trị này từ trước (không cần sửa UI). Test 2/3
+   lần đúng, 1 lần AI bỏ sót cả `loai` lẫn `trangThai` — cũng ghi nhận soft-compliance.
+4. **`trangThai`/`lyDoLoai` ở cấp NGUỒN** (giữ nguồn bị loại lại trong mảng, đánh dấu "bi-loai" thay vì xoá
+   hẳn) — đã sửa `/rewrite`, xác nhận đúng logic bằng test trực tiếp (không qua AI): nguồn bị loại giữ lại
+   với `trangThai: "bi-loai"` + `lyDoLoai`, các nguồn còn lại là `"dang-dung"`.
+
+**Bug kiến trúc mới phát hiện khi test (4) qua AI thật, chưa sửa:** `/rewrite` gọi lại `search_web_sources()`
+MỖI LẦN gọi — kết quả tìm kiếm không cố định giữa các lần gọi. Khi validate lại TOÀN BỘ hồ sơ đã ghép
+(gồm cả các `thongTin` KHÔNG bị ảnh hưởng bởi nguồn vừa loại, giữ nguyên từ lần sinh trước), các trích dẫn
+đó — vốn đã đúng với web_text CŨ lúc `/generate` — có thể không còn khớp với web_text MỚI vừa tìm lại,
+gây fail giả (không phải AI bịa, mà do so với dữ liệu nền đã đổi). 3/3 lần test `/rewrite` với dữ liệu cụ
+thể đều fail vì lỗi này. Hướng sửa đúng (chưa làm, cần thời gian): chỉ validate phần MỚI (`thongTinMoi`/
+`cauVietLai`) bằng Layer 4a/Layer 7, bỏ qua phần `thongTin` cũ giữ nguyên vì đã qua validate ở lượt sinh
+trước rồi.
