@@ -131,4 +131,20 @@ Bộ 20 case gốc ở trên không phủ hết 5 "chỗ sẽ khó" mà đề C3
 
 **Đã thử sửa và rollback:** thêm hướng dẫn "bắt buộc đủ số câu" vào prompt → **phản tác dụng nghiêm trọng**: AI bắt đầu lặp lại thông tin đã dùng nhưng gắn cho nguồn khác (kể cả nguồn có thật) để đủ số câu — Layer 4a/Layer 7 đúng đắn chặn lại, khiến tỉ lệ fail (502) tăng vọt thay vì có kịch bản dài hơn. Đã rollback về hướng dẫn mềm ("nên đạt khoảng N câu nếu nguồn đủ chất liệu, thà ngắn hơn còn hơn bịa/gắn sai nguồn") — an toàn hơn (không còn tăng fail rate) nhưng độ dài vẫn không đạt.
 
-**Nguyên nhân gốc:** slide mẫu (`d1`/`d2`, 6 trang) chỉ có ~5-7 sự kiện/khái niệm riêng biệt — không đủ chất liệu thật để viết 30+ câu không lặp/không bịa. Đây là giới hạn về **lượng dữ liệu nguồn**, không phải lỗi logic có thể sửa bằng prompt. Hướng giải quyết thật (chưa làm, để lại): cho phép AI viết câu diễn giải/mở rộng ý nghĩa sâu hơn cho mỗi sự kiện đã có (không thêm sự kiện mới) một cách có kiểm soát hơn, hoặc chấp nhận trong tài liệu hướng dẫn rằng thời lượng dài cần slide nguồn phong phú hơn tương ứng.
+**Nguyên nhân gốc:** slide mẫu (`d1`/`d2`, 6 trang) chỉ có ~5-7 sự kiện/khái niệm riêng biệt — không đủ chất liệu thật để viết 30+ câu không lặp/không bịa. Đây là giới hạn về **lượng dữ liệu nguồn**, không phải lỗi logic có thể sửa bằng prompt.
+
+**Lần thử thứ 2 (dựa trên phân tích kịch bản mẫu chính thức của BTC, 40 câu):** đọc kỹ kịch bản mẫu phát
+hiện: BTC đạt 40 câu không phải bằng cách liệt kê nhiều sự kiện có nguồn, mà bằng cách xây **1 ví dụ minh
+hoạ giả định duy nhất** (vd "bộ lọc thư rác") dùng lại xuyên suốt để giải thích từng khái niệm — các câu ví
+dụ minh hoạ không cần trích dẫn vì không phải sự thật cụ thể. Thử đưa chiến lược này vào prompt (chọn 1 ví
+dụ minh hoạ + xen kẽ với câu có trích dẫn thật) → **2/2 lần fail (502)**, tệ hơn cả trước: AI không chỉ lệch
+trích dẫn mà còn có dấu hiệu quay lại viết số bằng CHỮ SỐ thay vì chữ (phá luôn quy tắc Layer 6 đã ổn định).
+Kết luận: prompt đã quá dài/nhiều lớp yêu cầu (chống bịa, chống injection, đối chiếu chéo, không số, ưu
+tiên VN, gợi ý hiện nguồn...) — thêm 1 chiến lược phức tạp nữa làm AI rối, giảm chất lượng tuân thủ các
+quy tắc khác. Đã rollback về bản ổn định trước đó ngay khi phát hiện.
+
+**Quyết định cuối cùng cho CP4:** dừng hẳn việc tinh chỉnh độ dài kịch bản tại đây. Hướng giải quyết đúng
+(để lại cho sau, cần thời gian nhiều hơn): tách thành 2 lượt gọi AI riêng biệt — lượt 1 sinh kịch bản ngắn
+có trích dẫn chắc chắn đúng (như hiện tại), lượt 2 lấy kịch bản đó làm input CỐ ĐỊNH và chỉ thêm câu diễn
+giải/ví dụ minh hoạ xen kẽ (không được sửa câu gốc) — tách trách nhiệm sẽ ổn định hơn nhồi tất cả vào 1
+prompt.
