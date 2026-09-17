@@ -529,10 +529,22 @@ async def rewrite(
     ho_so = json.loads(ho_so_json)
     kich_ban = json.loads(kich_ban_json)
 
+    # Đúng schema chính thức (vi-du/ho-so-nguon-mau.json của BTC): nguồn bị loại KHÔNG bị xoá khỏi
+    # hồ sơ, chỉ đánh dấu trangThai="bi-loai" + lyDoLoai — giữ dấu vết audit cho giám khảo xem lại
+    # thay vì âm thầm biến mất khỏi dữ liệu.
+    removed_source = next((s for s in ho_so.get("nguon", []) if s["id"] == removed_source_id), None)
+    removed_source_marked = None
+    if removed_source is not None:
+        removed_source_marked = dict(removed_source)
+        removed_source_marked["trangThai"] = "bi-loai"
+        removed_source_marked["lyDoLoai"] = "Người duyệt loại nguồn này qua giao diện xem hồ sơ tài liệu."
+
     affected_thongtin_ids = {
         t["id"] for t in ho_so.get("thongTin", [])
         if any(bc.get("nguonId") == removed_source_id for bc in t.get("bangChung", []))
     }
+    # remaining_ho_so — dùng để MỚM CHO AI biết nguồn/thông tin nào còn dùng được (không gồm nguồn
+    # vừa bị loại, để AI không lỡ trích lại nó); nguồn bị loại được cộng lại riêng vào output cuối.
     remaining_ho_so = {
         "nguon": [s for s in ho_so.get("nguon", []) if s["id"] != removed_source_id],
         "thongTin": [t for t in ho_so.get("thongTin", []) if t["id"] not in affected_thongtin_ids],
@@ -543,8 +555,12 @@ async def rewrite(
     ]
 
     if not affected_cau:
-        # không câu nào phụ thuộc nguồn bị loại — chỉ cần bỏ nguồn khỏi hồ sơ, kịch bản giữ nguyên
-        return {"hoSo": remaining_ho_so, "kichBan": kich_ban, "rewrittenNs": []}
+        # không câu nào phụ thuộc nguồn bị loại — chỉ cần đánh dấu nguồn "bi-loai", kịch bản giữ nguyên
+        final_nguon = remaining_ho_so["nguon"] + ([removed_source_marked] if removed_source_marked else [])
+        return {
+            "hoSo": {"nguon": final_nguon, "thongTin": remaining_ho_so["thongTin"]},
+            "kichBan": kich_ban, "rewrittenNs": [],
+        }
 
     if file is not None:
         pdf_bytes = await file.read()
@@ -567,13 +583,13 @@ async def rewrite(
     )
 
     last_error = None
-    for attempt_prompt in (rewrite_prompt, rewrite_prompt + REWRITE_RETRY_SUFFIX):
+    for attempt_prompt in (rewrite_prompt, rewrite_prompt + REWRITE_RETRY_SUFFIX, rewrite_prompt + REWRITE_RETRY_SUFFIX):
         try:
             patch = call_openai(attempt_prompt, images_b64)
 
             # Chặn ID trùng — bug thật đã gặp: AI đặt "thongTinMoi" trùng id với thongTin còn
             # lại (vd cả 2 đều "tt2"), làm hồ sơ có 2 bản ghi cùng id khác nội dung, hỏng dữ liệu
-            existing_source_ids = {s["id"] for s in remaining_ho_so["nguon"]}
+            existing_source_ids = {s["id"] for s in remaining_ho_so["nguon"]} | {removed_source_id}
             existing_thongtin_ids = {t["id"] for t in remaining_ho_so["thongTin"]}
             for s in patch.get("nguonMoi", []):
                 if s["id"] in existing_source_ids:
@@ -583,7 +599,8 @@ async def rewrite(
                     raise ValueError(f"thongTinMoi id '{t['id']}' trùng với thongTin đã có sẵn")
 
             new_ho_so = {
-                "nguon": remaining_ho_so["nguon"] + patch.get("nguonMoi", []),
+                "nguon": remaining_ho_so["nguon"] + patch.get("nguonMoi", [])
+                    + ([removed_source_marked] if removed_source_marked else []),
                 "thongTin": remaining_ho_so["thongTin"] + patch.get("thongTinMoi", []),
             }
             cau_by_n = {c["n"]: c for c in kich_ban.get("cau", [])}

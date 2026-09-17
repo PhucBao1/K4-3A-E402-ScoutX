@@ -54,6 +54,8 @@ trên tác giả có rõ ràng không, có ngày công bố không, có được
 đánh giá ở khối NGUỒN TÌM ĐƯỢC TRÊN MẠNG: "tai-lieu-chinh-thuc" (tài liệu chính thức/tổ chức giáo dục),
 "bai-bao-khoa-hoc" (bài báo khoa học), "bao-chi" (báo/tạp chí công nghệ có biên tập), "blog-ca-nhan" (blog
 cá nhân/nguồn không rõ tác giả) — KHÔNG dùng chữ "web" chung chung nữa.
+"trangThai": LUÔN là "dang-dung" cho mọi nguồn bạn tạo ra ở đây (giá trị "bi-loai" chỉ do hệ thống tự gắn
+sau khi người dùng loại nguồn, không phải việc của bạn).
 Thêm 2 trường vào MỖI "nguon":
 - "ngayLayVe": LUÔN dùng đúng giá trị "{thoi_diem_hien_tai}" (thời điểm thật hiện tại, không tự đoán/bịa
   ngày khác) cho mọi nguồn, kể cả slide.
