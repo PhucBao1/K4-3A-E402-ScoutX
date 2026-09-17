@@ -77,18 +77,19 @@ _CHROME_STYLE = """
         opacity: 0;
       }
       #chrome-caption-bar {
-        position: absolute; left: 96px; right: 96px; bottom: 64px;
-        min-height: 96px; background: var(--card); border-radius: 20px;
-        display: flex; align-items: center; gap: 20px; padding: 24px 32px;
+        position: absolute; left: 96px; right: 96px; bottom: 48px; max-height: 96px;
+        background: var(--card); border-radius: 16px; overflow: hidden;
+        display: flex; align-items: center; gap: 16px; padding: 12px 28px;
         opacity: 0;
       }
       #chrome-caption-icon {
-        flex: none; width: 44px; height: 44px; border-radius: 50%;
+        flex: none; width: 36px; height: 36px; border-radius: 50%;
         background: var(--accent); color: var(--bg);
-        display: flex; align-items: center; justify-content: center; font-size: 22px;
+        display: flex; align-items: center; justify-content: center; font-size: 18px;
       }
       #chrome-caption-text {
-        color: var(--ink); font-size: 30px; line-height: 1.5;
+        color: var(--ink); font-size: 22px; line-height: 1.35;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
       }
       #ai-content {
         position: absolute; left: 96px; top: 300px; width: 1728px; height: 440px;
