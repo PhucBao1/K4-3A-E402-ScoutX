@@ -1,4 +1,4 @@
-# Golden set — ScriptScout (CP3)
+# Golden set — ScriptScout
 
 Cơ cấu theo `02-guide.md` §2.6: ≥2 case/lớp trong 4 lớp chỗ khó (8 case) + 8-10 case thường + 2-4 case hiếm.
 16/20 case dựng từ nội dung thật của `d1-slide-hackathon.pdf` và `d2-slide-hackathon.pdf` (đọc trực tiếp từ
@@ -452,3 +452,48 @@ không dính lỗi này.
 **Kết luận:** đúng là do prompt/kiến trúc thiếu, không phải do model. Chưa render lại full video 32 câu để
 đo end-to-end (chỉ verify từng cảnh đơn lẻ qua `check`), nên chưa khẳng định 100% hết "lỗi nhiều" ở quy mô
 cả video — cần render lại 1 lần đầy đủ để xác nhận trước khi coi đây là "đạt".
+
+## Case 35 — 3 lớp cải thiện tiếp theo cho HyperFrames: khung thương hiệu, thẻ/card, đổi model (bonus)
+
+Tiếp nối case 34, render lại full 32 câu để xác nhận (lệnh V2) — hết sạch 2 bug đã nêu, nhưng lộ ra vấn đề
+mới: bố cục nhìn "trống trải" (chữ trần không có nền/viền, nhiều khoảng đen thừa). So sánh với 1 video mẫu
+(`transformer_explainer.mp4`, xác nhận cùng render bằng CLI HyperFrames qua metadata nhưng KHÔNG qua pipeline
+của mình) + đọc guide chính thức HeyGen — phát hiện thiếu: (1) khung thương hiệu cố định dùng chung mọi
+cảnh, (2) quy tắc bắt buộc "trọng lượng thị giác" (nền/viền) cho mọi ô/nhãn.
+
+**Đã sửa (3 thay đổi, mỗi cái verify bằng `hyperframes check` + ảnh chụp thật):**
+1. **Refactor kiến trúc** (`render_video_hyperframes.py`): tách "khung thương hiệu" (eyebrow, accent-bar,
+   tiêu đề, khung phụ đề có icon, nhãn nguồn) thành phần DO CODE RENDER CỐ ĐỊNH, dùng chung cho cả bản mẫu
+   an toàn lẫn cảnh AI — AI giờ chỉ vẽ sơ đồ trong 1 vùng riêng 1728x440 (toạ độ cục bộ). Phát hiện + sửa
+   luôn 1 bug do chính mình gây (CSS `transform` tĩnh + GSAP tween cùng thuộc tính → GSAP ghi đè mất trạng
+   thái ban đầu, lint bắt được qua `gsap_css_transform_conflict`) và 1 bug khác (GSAP animate `#chrome-
+   source-tag` dù câu không có nguồn nên phần tử không tồn tại → console warning).
+2. **Quy tắc "trọng lượng thị giác"** (`prompt.py`): bắt buộc mọi ô/nhãn có nền đặc hoặc viền dày + bo góc +
+   padding tối thiểu, cấm chữ trần không có gì bao quanh. Test trực tiếp: cùng 1 câu trước/sau đều pass
+   check sạch, nhưng sau khi thêm quy tắc thì layout đổi từ đường kẻ mảnh sang thẻ/card như dashboard thật.
+3. **Đổi model thiết kế cảnh** `gpt-4o-mini` → **`gpt-5.4-mini`** (giống đúng bài học case 33 ở bước
+   expand-script): test trực tiếp câu "AI như xây một ngôi nhà" — bản cũ chỉ vẽ 1 khung chữ nhật trống có
+   chữ "Nền móng" bên trong; bản mới vẽ HẲN 1 hình ngôi nhà thật (mái, tường, các bậc thang dẫn lên) kèm 2
+   thẻ nhãn + 1 sơ đồ quy trình phụ "1→2→3→...→n". Khác biệt rất rõ, không mơ hồ.
+
+**Phát hiện thêm khi đo tốc độ (không phải bug, chỉ là bài học đo lường):** nghi ngờ ban đầu "tăng luồng
+song song từ 4→6 làm chậm hơn" — kiểm chứng bằng cách chạy lại 4 luồng thì CŨNG chậm hơn bản gốc (381.5s và
+329.5s so với 272.6s), tức không phải do số luồng. RAM/tiến trình rác cũng không giải thích được (kiểm tra
+`free -h` + `ps aux` đều bình thường). Kết luận trung thực: 4 lần đo full-pipeline (270-384s) dao động quá
+lớn để quy kết chắc chắn cho 1 nguyên nhân đơn lẻ (khả năng cao là nhiễu mạng lúc gọi TTS/OpenAI + máy ảo
+dùng chung host, không phải lỗi code) — phép đo cục bộ đáng tin cậy hơn (lint 1.3s vs check 6.7s, đo trên
+máy, không qua mạng) vẫn đúng hướng, chỉ là chưa chứng minh được lợi ích rõ trên toàn pipeline bằng vài lần
+đo full-video (mỗi lần tốn tiền API thật, không nên lạm dụng để đuổi theo 1 con số nhiễu).
+
+**Vòng tự-sửa 2 tầng (nâng cấp thêm sau khi thấy vòng tự-sửa cũ hầu như không kích hoạt — 32 câu chỉ có
+đúng 1 lần "lint thấy lỗi", còn lại toàn bộ lần fail đều ở tầng `check` sâu hơn mà vòng cũ không đọc
+được):** thêm `check_scene()` đọc `hyperframes check --json` (schema finding giống hệt lint: code/message/
+fixHint), cho `fix_ai_scene()` vá đúng lỗi CHECK thật (không chỉ lint) trước khi bỏ đi sinh lại từ đầu. Test
+trực tiếp đúng 2 câu từng rớt về bản mẫu an toàn ở lần chạy full trước đó (câu 18 "Giới thiệu Transformer",
+câu 22 "Chọn điểm quan trọng") — cả 2 giờ đều **thành công AI tự thiết kế** với sơ đồ chi tiết (câu 18 phải
+vá 2 vòng × 2 lần mới sạch, đúng bằng chứng đây là lỗi thật được sửa từng bước, không phải mù).
+
+**Kết luận:** cả 3+1 thay đổi đều có bằng chứng trực tiếp (ảnh chụp trước/sau, log lint/check thật), không
+suy đoán. Đánh đổi thật: gpt-5.4-mini đắt hơn ~5-7x và thiết kế phức tạp hơn dễ vướng lỗi bố cục hơn (cần
+vá nhiều hơn) — tốc độ tổng thể CHƯA chắc nhanh hơn bản gốc, nhưng chất lượng hình ảnh cải thiện rõ rệt,
+theo đúng ưu tiên người dùng chọn ("muốn chất lượng hơn" hơn là tốc độ).
