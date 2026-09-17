@@ -44,6 +44,91 @@ HYPERFRAMES_BIN_DIR = os.environ.get("HF_BIN_DIR") or (
 WIDTH, HEIGHT = 1920, 1080
 SILENCE_DEFAULT_SEC = 2.0
 
+# Khung thương hiệu CỐ ĐỊNH (do code kiểm soát, không để AI tự bịa mỗi cảnh) — dùng chung cho cả
+# bản mẫu an toàn lẫn cảnh do AI thiết kế, để mọi cảnh trong video nhìn LIỀN MẠCH thay vì rời rạc.
+# Học từ guide chính thức của HyperFrames (hyperframes.heygen.com/guides/prompting +
+# github.com/heygen-com/hyperframes/blob/main/docs/guides/claude-design-hyperframes.md): dùng
+# design tokens :root dùng chung, giữ khung thương hiệu (eyebrow/accent-bar/caption card) cố định
+# qua mọi cảnh, để phần AI tự thiết kế chỉ còn đúng 1 việc — sơ đồ minh hoạ — thu hẹp bề mặt lỗi.
+_CHROME_STYLE = """
+      :root {
+        --bg:#0A0A0F; --ink:#F5F5F5; --accent:#58C4DD; --accent2:#FFC857; --muted:#B7B7C2; --card:#16161F;
+      }
+      #chrome-eyebrow {
+        position: absolute; left: 96px; top: 88px;
+        color: var(--accent); font-family: 'Space Grotesk', Arial, sans-serif;
+        font-size: 26px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+        opacity: 0;
+      }
+      #chrome-accent-bar {
+        position: absolute; left: 96px; top: 132px; width: 110px; height: 6px;
+        background: var(--accent); border-radius: 4px; transform-origin: left;
+      }
+      #chrome-headline {
+        position: absolute; left: 96px; top: 164px; width: 1400px;
+        color: var(--ink); font-family: 'Space Grotesk', Arial, sans-serif;
+        font-size: 56px; font-weight: 900; line-height: 1.2;
+        opacity: 0;
+      }
+      #chrome-source-tag {
+        position: absolute; right: 96px; top: 88px;
+        color: var(--muted); font-size: 20px;
+        background: var(--card); padding: 8px 18px; border-radius: 100px;
+        opacity: 0;
+      }
+      #chrome-caption-bar {
+        position: absolute; left: 96px; right: 96px; bottom: 64px;
+        min-height: 96px; background: var(--card); border-radius: 20px;
+        display: flex; align-items: center; gap: 20px; padding: 24px 32px;
+        opacity: 0;
+      }
+      #chrome-caption-icon {
+        flex: none; width: 44px; height: 44px; border-radius: 50%;
+        background: var(--accent); color: var(--bg);
+        display: flex; align-items: center; justify-content: center; font-size: 22px;
+      }
+      #chrome-caption-text {
+        color: var(--ink); font-size: 30px; line-height: 1.5;
+      }
+      #ai-content {
+        position: absolute; left: 96px; top: 300px; width: 1728px; height: 440px;
+        overflow: hidden;
+      }
+"""
+
+
+def _chrome_html(headline: str, caption: str, eyebrow: str, source_tag: str, duration: float) -> str:
+    source_tag_html = ""
+    if source_tag:
+        source_tag_html = (
+            f'<p id="chrome-source-tag" class="clip" data-start="0" '
+            f'data-duration="{duration}">{html.escape(source_tag)}</p>'
+        )
+    return (
+        f'<p id="chrome-eyebrow" class="clip" data-start="0" data-duration="{duration}">'
+        f'{html.escape(eyebrow)}</p>\n'
+        f'<div id="chrome-accent-bar" class="clip" data-start="0" data-duration="{duration}"></div>\n'
+        f'<h1 id="chrome-headline" class="clip" data-start="0" data-duration="{duration}">'
+        f'{html.escape(headline)}</h1>\n'
+        f'{source_tag_html}\n'
+        f'<div id="chrome-caption-bar" class="clip" data-start="0" data-duration="{duration}">\n'
+        f'  <div id="chrome-caption-icon">&#128266;</div>\n'
+        f'  <div id="chrome-caption-text">{html.escape(caption)}</div>\n'
+        f'</div>'
+    )
+
+
+def _chrome_gsap(fade_out_start: float) -> str:
+    return "\n      ".join([
+        'tl.to("#chrome-eyebrow", {opacity:1,duration:0.4}, 0.1);',
+        'tl.fromTo("#chrome-accent-bar", {scaleX:0}, {scaleX:1,duration:0.5}, 0.3);',
+        'tl.fromTo("#chrome-headline", {opacity:0,y:24}, {opacity:1,y:0,duration:0.6}, 0.4);',
+        'tl.to("#chrome-source-tag", {opacity:1,duration:0.4}, 0.6);',
+        'tl.fromTo("#chrome-caption-bar", {opacity:0,y:16}, {opacity:1,y:0,duration:0.5}, 1.0);',
+        f'tl.to("#root", {{opacity:0,duration:0.35}}, {fade_out_start});',
+    ])
+
+
 SCENE_TEMPLATE = """<!doctype html>
 <html lang="vi" data-resolution="landscape">
   <head>
@@ -59,32 +144,11 @@ SCENE_TEMPLATE = """<!doctype html>
         font-family: 'IBM Plex Sans', Arial, sans-serif;
       }}
       #root {{ width: 100%; height: 100%; position: relative; }}
-      #eyebrow {{
-        position: absolute; left: 128px; top: 96px;
-        color: #58C4DD; font-family: 'Space Grotesk', Arial, sans-serif;
-        font-size: 28px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase;
-        opacity: 0;
-      }}
-      #headline {{
-        position: absolute; left: 128px; top: 220px; width: 1600px;
-        color: #F5F5F5; font-family: 'Space Grotesk', Arial, sans-serif;
-        font-size: 76px; font-weight: 700; line-height: 1.15;
-        opacity: 0;
-      }}
-      #accent-bar {{
-        position: absolute; left: 128px; top: 176px; width: 120px; height: 8px;
-        background: #58C4DD; border-radius: 4px; transform: scaleX(0); transform-origin: left;
-      }}
-      #caption {{
-        position: absolute; left: 128px; bottom: 120px; width: 1664px;
-        color: #B7B7C2; font-size: 34px; line-height: 1.5;
-        opacity: 0;
-      }}
-      #source-tag {{
-        position: absolute; right: 128px; top: 96px;
-        color: #B7B7C2; font-size: 22px;
-        background: #16161F; padding: 10px 20px; border-radius: 100px;
-        opacity: 0;
+      {chrome_style}
+      #safe-ring {{
+        position: absolute; left: 50%; top: 50%; width: 260px; height: 260px;
+        margin: -130px 0 0 -130px; border-radius: 50%;
+        border: 2px solid var(--accent); opacity: 0;
       }}
     </style>
   </head>
@@ -98,20 +162,16 @@ SCENE_TEMPLATE = """<!doctype html>
       data-width="1920"
       data-height="1080"
     >
-      <p id="eyebrow" class="clip" data-start="0" data-duration="{duration}" data-track-index="0">{eyebrow}</p>
-      <div id="accent-bar" class="clip" data-start="0" data-duration="{duration}" data-track-index="1"></div>
-      <h1 id="headline" class="clip" data-start="0" data-duration="{duration}" data-track-index="2">{headline}</h1>
-      <p id="caption" class="clip" data-start="0" data-duration="{duration}" data-track-index="3">{caption}</p>
-      {source_tag_html}
+      {chrome_html}
+      <div id="ai-content" class="clip" data-start="0" data-duration="{duration}">
+        <div id="safe-ring" class="clip" data-start="0" data-duration="{duration}"></div>
+      </div>
     </div>
     <script>
       const tl = gsap.timeline({{ paused: true }});
-      tl.to("#eyebrow", {{ opacity: 1, duration: 0.4 }}, 0.1);
-      tl.to("#accent-bar", {{ scaleX: 1, duration: 0.5 }}, 0.3);
-      tl.fromTo("#headline", {{ opacity: 0, y: 24 }}, {{ opacity: 1, y: 0, duration: 0.6 }}, 0.4);
-      tl.fromTo("#caption", {{ opacity: 0, y: 12 }}, {{ opacity: 1, y: 0, duration: 0.5 }}, 1.0);
-      tl.to("#source-tag", {{ opacity: 1, duration: 0.4 }}, 1.2);
-      tl.to("#root", {{ opacity: 0, duration: 0.35 }}, {fade_out_start});
+      {chrome_gsap}
+      tl.fromTo("#safe-ring", {{ opacity: 0, scale: 0.85 }}, {{ opacity: 0.5, scale: 1, duration: 1.2, ease: "power2.out" }}, 0.6);
+      tl.to("#safe-ring", {{ scale: 1.05, duration: 2, ease: "sine.inOut", yoyo: true, repeat: 999 }}, 1.8);
 
       window.__timelines = window.__timelines || {{}};
       window.__timelines["main"] = tl;
@@ -140,20 +200,15 @@ def _run_env() -> dict:
 
 
 def render_scene_html(cau: dict, duration: float) -> str:
-    headline = html.escape(cau.get("chuTrenManHinh") or cau.get("loi", "")[:40])
-    caption = html.escape(cau.get("loi", ""))
+    headline = cau.get("chuTrenManHinh") or cau.get("loi", "")[:40]
+    caption = cau.get("loi", "")
     eyebrow = "ScriptScout"
-    source_tag_html = ""
-    goi_y = cau.get("goiYHienNguon")
-    if goi_y:
-        source_tag_html = (
-            f'<p id="source-tag" class="clip" data-start="0" data-duration="{duration}" '
-            f'data-track-index="4">{html.escape(goi_y)}</p>'
-        )
+    goi_y = cau.get("goiYHienNguon", "")
     fade_out_start = max(duration - 0.4, 0.1)
+    chrome_html = _chrome_html(headline, caption, eyebrow, goi_y, duration)
     return SCENE_TEMPLATE.format(
-        duration=duration, headline=headline, caption=caption, eyebrow=eyebrow,
-        source_tag_html=source_tag_html, fade_out_start=fade_out_start,
+        duration=duration, chrome_style=_CHROME_STYLE, chrome_html=chrome_html,
+        chrome_gsap=_chrome_gsap(fade_out_start),
     )
 
 
@@ -172,6 +227,7 @@ AI_SCENE_WRAPPER = """<!doctype html>
         font-family: 'IBM Plex Sans', Arial, sans-serif;
       }}
       #root {{ width: 100%; height: 100%; position: relative; overflow: hidden; }}
+      {chrome_style}
     </style>
   </head>
   <body>
@@ -184,13 +240,15 @@ AI_SCENE_WRAPPER = """<!doctype html>
       data-width="1920"
       data-height="1080"
     >
-      {ai_html}
+      {chrome_html}
+      <div id="ai-content" class="clip" data-start="0" data-duration="{duration}">
+        {ai_html}
+      </div>
     </div>
     <script>
       const tl = gsap.timeline({{ paused: true }});
+      {chrome_gsap}
       {ai_gsap}
-      tl.to("#root", {{ opacity: 0, duration: 0.35 }}, {fade_out_start});
-
       window.__timelines = window.__timelines || {{}};
       window.__timelines["main"] = tl;
       tl.seek(0);
@@ -202,17 +260,18 @@ AI_SCENE_WRAPPER = """<!doctype html>
 
 def generate_ai_scene(cau: dict, duration: float) -> dict | None:
     """Cho AI tự thiết kế bố cục cảnh (đa dạng hơn 1 template cố định), guard chặt: bắt buộc
-    chữ tiêu đề + lời đọc phải xuất hiện NGUYÊN VĂN trong HTML trả về, không cho paraphrase/bịa
-    thêm chữ — đúng nguyên tắc "chữ trên màn hình không được lệch nội dung" đã áp dụng cho
-    validate_output() ở main.py. Trả về None nếu AI lỗi/vi phạm, để nơi gọi tự rớt về
+    tiêu đề/phụ đề/nguồn giờ do KHUNG THƯƠNG HIỆU CỐ ĐỊNH đảm nhiệm (_chrome_html/_chrome_gsap,
+    render y hệt cho mọi cảnh, không thể sai), nên AI chỉ còn đúng 1 việc: vẽ SƠ ĐỒ minh hoạ bên
+    trong vùng #ai-content (1728x440, toạ độ 0,0 là góc trên-trái vùng này). Thu hẹp việc AI phải
+    làm giúp giảm bề mặt lỗi (không cần guard chữ nguyên văn nữa vì AI không tự render chữ tiêu
+    đề/phụ đề). Trả về None nếu AI lỗi/vi phạm ràng buộc kỹ thuật, để nơi gọi tự rớt về
     render_scene_html() (bản mẫu cố định, an toàn tuyệt đối)."""
-    chu_tren_man_hinh = cau.get("chuTrenManHinh") or cau.get("loi", "")[:40]
-    loi = cau.get("loi", "")
     try:
         resp = openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": HYPERFRAMES_SCENE_PROMPT.format(
-                chu_tren_man_hinh=chu_tren_man_hinh, loi=loi,
+                chu_tren_man_hinh=cau.get("chuTrenManHinh") or cau.get("loi", "")[:40],
+                loi=cau.get("loi", ""),
                 y_do_hinh=cau.get("yDoHinh", ""), duration=round(duration, 2),
             )}],
             response_format={"type": "json_object"},
@@ -221,11 +280,6 @@ def generate_ai_scene(cau: dict, duration: float) -> dict | None:
         ai_html = data.get("html", "")
         ai_gsap = data.get("gsap", [])
         if not ai_html or not isinstance(ai_gsap, list):
-            return None
-        # Guard: chữ tiêu đề/lời đọc phải xuất hiện nguyên văn — chặn AI paraphrase/bịa chữ mới
-        if chu_tren_man_hinh and chu_tren_man_hinh not in ai_html:
-            return None
-        if loi and loi not in ai_html:
             return None
         if any(bad in ai_html for bad in ("<script", "Math.random", "Date.now", "fetch(")):
             return None
@@ -237,11 +291,15 @@ def generate_ai_scene(cau: dict, duration: float) -> dict | None:
         return None
 
 
-def build_ai_scene_html(ai_content: dict, duration: float) -> str:
+def build_ai_scene_html(cau: dict, ai_content: dict, duration: float) -> str:
     fade_out_start = max(duration - 0.4, 0.1)
+    headline = cau.get("chuTrenManHinh") or cau.get("loi", "")[:40]
+    caption = cau.get("loi", "")
+    chrome_html = _chrome_html(headline, caption, "ScriptScout", cau.get("goiYHienNguon", ""), duration)
     return AI_SCENE_WRAPPER.format(
-        duration=duration, ai_html=ai_content["html"], ai_gsap=ai_content["gsap"],
-        fade_out_start=fade_out_start,
+        duration=duration, chrome_style=_CHROME_STYLE, chrome_html=chrome_html,
+        chrome_gsap=_chrome_gsap(fade_out_start),
+        ai_html=ai_content["html"], ai_gsap=ai_content["gsap"],
     )
 
 
@@ -297,7 +355,7 @@ def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
         if ai_content is None:
             continue
         with open(index_path, "w", encoding="utf-8") as f:
-            f.write(build_ai_scene_html(ai_content, duration))
+            f.write(build_ai_scene_html(cau, ai_content, duration))
         if validate_scene(project_dir):
             used_ai_scene = True
             break

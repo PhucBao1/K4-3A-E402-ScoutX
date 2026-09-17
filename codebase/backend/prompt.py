@@ -313,7 +313,11 @@ tục từ 1 cho cả kịch bản sau khi chèn>]}}
 """
 
 HYPERFRAMES_SCENE_PROMPT = """Bạn là nhà thiết kế motion graphics cho video bài giảng, dùng HyperFrames
-(HTML/CSS + GSAP timeline, canvas 1920x1080). Thiết kế 1 CẢNH cho đúng 1 câu kịch bản dưới đây.
+(HTML/CSS + GSAP timeline). Tiêu đề, phụ đề (lời đọc) và nhãn nguồn ĐÃ được 1 khung thương hiệu cố định
+(do code render riêng, không phải việc của bạn) hiển thị sẵn ở trên/dưới màn hình — việc DUY NHẤT của bạn
+là thiết kế 1 SƠ ĐỒ minh hoạ, đặt bên trong 1 vùng canvas riêng kích thước 1728x440 (toạ độ (0,0) là góc
+trên-trái của VÙNG NÀY, không phải góc màn hình 1920x1080 — dùng position:absolute với left/top tính theo
+vùng 1728x440 này).
 
 QUAN TRỌNG NHẤT — hình ảnh phải THỰC SỰ MINH HOẠ đúng cơ chế/khái niệm đang nói, KHÔNG được là hình
 trang trí chung chung (cấm: hình tròn/khối màu không mang ý nghĩa, icon ngẫu nhiên không liên quan trực
@@ -331,11 +335,12 @@ tiếp tới nội dung câu này). Đọc kỹ "loi" + "yDoHinh" rồi CHỌN �
   độ dài theo đúng chiều tăng giảm được mô tả.
 - Nếu không khớp mẫu nào ở trên, tự nghĩ ra 1 sơ đồ ĐƠN GIẢN nhưng THỂ HIỆN ĐÚNG cơ chế cụ thể trong câu
   (vẽ bằng các thẻ div/CSS shape hoặc SVG đơn giản, không cần đẹp cầu kỳ, ưu tiên ĐÚNG NGHĨA hơn ĐẸP).
-Tiêu đề + phụ đề chữ vẫn cần có (không bỏ), nhưng sơ đồ minh hoạ mới là trọng tâm cảnh, đặt chỗ nổi bật.
+Chỉ vẽ nhãn/số liệu/chữ trong sơ đồ khi thật sự cần để minh hoạ (vd nhãn 1 ô, 1 con số) — KHÔNG cần lặp
+lại nguyên câu tiêu đề/phụ đề vì đã hiển thị sẵn ở khung cố định rồi.
 
-Chữ trên màn hình (bắt buộc dùng ĐÚNG NGUYÊN VĂN, không paraphrase, không rút gọn):
+Ngữ cảnh câu này (đọc để chọn đúng sơ đồ, KHÔNG cần vẽ lại thành chữ trừ khi làm nhãn ngắn cho sơ đồ):
 - Tiêu đề: "{chu_tren_man_hinh}"
-- Phụ đề/lời đọc: "{loi}"
+- Lời đọc: "{loi}"
 Ý đồ hình ảnh (mô tả cơ chế cần vẽ — đọc kỹ, đây là thứ quan trọng nhất để chọn đúng sơ đồ): {y_do_hinh}
 Thời lượng cảnh: {duration} giây.
 
@@ -370,28 +375,38 @@ rotate/translate) mượt bằng ease "power2.inOut" hoặc "power1.out" thay v�
 nhất 1 hiệu ứng "vẽ dần" (stroke-dashoffset) hoặc biến hình mượt, không được chỉ fade-in/scale-in tĩnh.
 
 RÀNG BUỘC KỸ THUẬT (vi phạm sẽ bị huỷ, dùng bản mẫu an toàn thay thế):
-- Chỉ trả về NỘI DUNG BÊN TRONG thẻ #root (các thẻ div/p/h1/svg...), KHÔNG trả về <html>/<head>/<body>/<script>.
+- Chỉ trả về NỘI DUNG BÊN TRONG vùng vẽ (các thẻ div/p/svg...), KHÔNG trả về <html>/<head>/<body>/<script>,
+  KHÔNG tự vẽ tiêu đề/phụ đề/nhãn nguồn (đã có khung cố định lo phần đó).
 - Mọi phần tử có hoạt ảnh timing phải có class="clip" data-start="0" data-duration="{duration}".
-- Toạ độ phải nằm trong khung 1920x1080 (dùng position:absolute với left/top/width/height hợp lý, chừa lề
-  ít nhất 96px mỗi cạnh). Vùng an toàn để đặt nội dung là 1728x888 (1920-96*2 x 1080-96*2) — TÍNH TOÁN kích
-  thước/khoảng cách dựa trên vùng an toàn này, không đặt cứng 1 độ rộng/khoảng cách cố định rồi hy vọng vừa.
+- TOẠ ĐỘ TÍNH THEO VÙNG VẼ RIÊNG 1728x440 (không phải màn hình 1920x1080) — dùng position:absolute với
+  left/top/width/height trong khoảng [0, 1728] x [0, 440], chừa lề trong tối thiểu 24px mỗi cạnh của vùng
+  này. TÍNH TOÁN kích thước/khoảng cách dựa theo con số 1728x440 thật, không đặt cứng rồi hy vọng vừa.
 - DÃY PHẦN TỬ LẶP LẠI SỐ LƯỢNG ĐỘNG (mốc thời gian, bước, chi tiết...): nếu có nhiều hơn 4 phần tử, KHÔNG
   vẽ hết toàn bộ — chỉ vẽ 3 phần tử đầu rồi thêm 1 phần tử "..." rồi tới phần tử CUỐI CÙNG (mẫu: "1, 2, 3,
-  ..., n"), để không bao giờ tràn ra ngoài vùng an toàn dù số lượng thực tế bao nhiêu. Nếu ≤4 phần tử, chia
-  đều chiều rộng bằng % hoặc calc(), không dùng width cố định theo px cho từng ô.
+  ..., n"), để không bao giờ tràn ra ngoài vùng vẽ dù số lượng thực tế bao nhiêu. Nếu ≤4 phần tử, chia đều
+  chiều rộng bằng % hoặc calc(), không dùng width cố định theo px cho từng ô.
 - KHÔNG BAO GIỜ đặt text (nhãn/label) đè lên đúng vị trí 1 đường kẻ/viền (line/border) — nếu có đường kẻ đi
   ngang qua khu vực có chữ, dịch chữ lệch hẳn lên trên hoặc xuống dưới đường kẻ đó tối thiểu bằng chiều cao
   dòng chữ, không để đường kẻ cắt ngang giữa dòng chữ.
-- Sơ đồ minh hoạ phải LẤP ĐẦY hợp lý vùng an toàn (không vẽ 1 hình nhỏ lọt thỏm giữa khoảng trống mênh
-  mông) — nếu cảnh chỉ có 1 sơ đồ nhỏ, phóng to kích thước hoặc căn giữa cả theo chiều ngang lẫn dọc của
-  vùng an toàn, không dồn về 1 góc/cạnh để trống phần lớn còn lại.
-- Text tiêu đề và phụ đề ở trên PHẢI xuất hiện nguyên văn đâu đó trong HTML (không đổi chữ, không bịa thêm
-  chữ mới ngoài 2 câu đó và các nhãn/số liệu đã có sẵn trong câu).
+- Sơ đồ minh hoạ phải LẤP ĐẦY hợp lý vùng vẽ 1728x440 (không vẽ 1 hình nhỏ lọt thỏm giữa khoảng trống mênh
+  mông) — nếu chỉ có 1 sơ đồ nhỏ, phóng to kích thước hoặc căn giữa cả theo chiều ngang lẫn dọc của vùng
+  vẽ, không dồn về 1 góc/cạnh để trống phần lớn còn lại.
+- NHÃN CHỮ trong sơ đồ (nếu có) tối thiểu 22px; nếu có 1 số liệu/từ khoá cần nổi bật nhất trong sơ đồ, dùng
+  độ đậm tương phản rõ (vd 700-900) so với nhãn phụ nhạt hơn (400-500) — không dùng chữ cùng 1 độ đậm cho
+  mọi thứ, nhìn sẽ phẳng/thiếu phân cấp.
+- KHÔNG ĐỨNG YÊN: nếu {duration} giây > 4.5, sau hiệu ứng xuất hiện ban đầu PHẢI thêm 1 chuyển động nền nhẹ
+  lặp lại tới hết cảnh (vd scale 1↔1.03 kiểu "thở" bằng yoyo:true,repeat:-1, hoặc trôi nhẹ vài px) — không
+  để sơ đồ đứng hình hoàn toàn sau khi vẽ/xuất hiện xong.
+- TRÁNH mẫu nhìn rẻ tiền/lặp lại: không dùng nhiều thẻ/card giống hệt nhau không có gì phân biệt, không chỉ
+  dùng 1 dải màu viền trái làm cách trang trí duy nhất, không vẽ hình tròn/khối màu không mang ý nghĩa gì.
 - KHÔNG dùng Math.random(), Date.now(), fetch, hay bất kỳ nguồn ngẫu nhiên/không xác định nào.
 - KHÔNG dùng ảnh/video/font URL bên ngoài nào khác.
+- Nếu 1 phần tử cần trạng thái transform ban đầu (scale/translate/rotate) VÀ gsap cũng animate transform
+  đó, dùng tl.fromTo(...) để gsap set CẢ 2 đầu (từ → đến), KHÔNG đặt sẵn transform trong CSS rồi chỉ dùng
+  tl.to(...) 1 chiều — gsap sẽ ghi đè toàn bộ transform và phá mất trạng thái ban đầu đặt trong CSS.
 
 Trả về ĐÚNG JSON, không thêm chữ nào khác:
-{{"html": "<...các thẻ bên trong #root, escape đúng JSON, ưu tiên có <svg><path stroke=\\"#58C4DD\\"
+{{"html": "<...các thẻ bên trong vùng vẽ, escape đúng JSON, ưu tiên có <svg><path stroke=\\"#58C4DD\\"
   stroke-dasharray=\\"1000\\" stroke-dashoffset=\\"1000\\" fill=\\"none\\" .../></svg> cho phần đường vẽ...>",
   "gsap": ["tl.fromTo(\\"#pathId\\", {{strokeDashoffset:1000}}, {{strokeDashoffset:0,duration:1.2,ease:\\"power2.inOut\\"}}, 0)", "tl.fromTo(\\"#id\\", {{opacity:0}}, {{opacity:1,duration:0.5}}, 0)", "..."]}}
 "gsap" là mảng các dòng lệnh GSAP (timeline đã có sẵn tên "tl", KHÔNG khai báo lại), mỗi dòng 1 lệnh
