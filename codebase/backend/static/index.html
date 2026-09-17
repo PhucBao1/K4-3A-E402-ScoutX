@@ -696,11 +696,16 @@ async function expandScript({ silent = false } = {}) {
   const originalExpandText = expandScriptBtn.textContent;
   expandScriptBtn.textContent = '✨ Đang làm phong phú…';
 
+  // Dùng /expand-script-full — gọi LẶP nhiều vòng expand_script_with_analogy() ở backend (xem
+  // main.py: expand_script_to_target()) để cố đạt gần số câu mục tiêu theo thời lượng mong muốn,
+  // thay vì chỉ +5-6 câu như 1 lần expand cũ (/expand-script vẫn còn, không đổi hành vi).
+  const durationInput = document.getElementById('duration');
   const formData = new FormData();
   formData.append('kich_ban_json', JSON.stringify(AppState.kichBanJson));
+  formData.append('duration', durationInput ? durationInput.value : '4');
 
   try {
-    const res = await fetch('/expand-script', { method: 'POST', body: formData });
+    const res = await fetch('/expand-script-full', { method: 'POST', body: formData });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
@@ -709,13 +714,19 @@ async function expandScript({ silent = false } = {}) {
     if (!data.daMoRong) {
       // silent (tự động sau /generate) — không coi là lỗi, kịch bản gốc vẫn dùng bình thường,
       // chỉ báo khi người dùng CHỦ ĐỘNG bấm nút để thử làm phong phú thêm lần nữa
-      if (!silent) showError('Không mở rộng được lần này (AI vi phạm luật hoặc lỗi) — giữ nguyên kịch bản gốc, thử lại sau.');
+      if (!silent) showError('Không mở rộng được lần này (AI vi phạm luật hoặc lỗi ngay từ vòng đầu) — giữ nguyên kịch bản gốc, thử lại sau.');
     } else {
       AppState.kichBanJson = data.kichBan;
       const mapped = mapOfficialToInternal(AppState.hoSoJson, data.kichBan);
       AppState.sentences = mapped.sentences;
       renderSentences();
       renderQaContentRows();
+      // Ghi log tham khảo (không phải lỗi) — số vòng thật đã chạy và lý do dừng, giúp người dùng
+      // hiểu vì sao không phải lúc nào cũng đạt đúng số câu mục tiêu (vd dừng sớm vì hết ý mới).
+      console.log(
+        `Làm phong phú: ${data.soCauBanDau} → ${data.soCauCuoi} câu ` +
+        `(mục tiêu ${data.soCauMucTieu}, chạy ${data.soVongDaChay} vòng, dừng vì: ${data.lyDoDung})`
+      );
     }
   } catch (err) {
     if (!silent) showError(err.message || 'Không mở rộng được, vui lòng thử lại.');

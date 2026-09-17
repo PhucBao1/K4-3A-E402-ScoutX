@@ -382,22 +382,36 @@ def check_content_conformance(pairs: list[dict]) -> list[dict]:
     }) for p in pairs]
 
 
-def expand_script_with_analogy(kich_ban: dict) -> dict:
+def expand_script_with_analogy(kich_ban: dict, so_cau_con_thieu: int | None = None) -> dict:
     """Lượt AI THỨ HAI, tách riêng khỏi sinh nội dung chính — chỉ chèn thêm câu diễn giải/ví dụ
     minh hoạ (nguon: []) để kéo dài kịch bản theo phong cách 3Blue1Brown, không đụng câu gốc đã
     validate xong ở lượt 1. An toàn tuyệt đối: lỗi bất kỳ đâu (API lỗi, AI sửa câu gốc, câu mới vi
     phạm luật) đều TỰ ĐỘNG rớt về kịch bản gốc — không bao giờ làm hỏng kết quả chính. Tách làm 2
     lượt vì nhồi việc "kéo dài" vào chung 1 prompt với việc "trích dẫn đúng" đã thử 2 lần đều thất
-    bại (AI bắt đầu bịa/gắn sai nguồn để đủ dài) — xem eval/golden-set.md case 24."""
+    bại (AI bắt đầu bịa/gắn sai nguồn để đủ dài) — xem eval/golden-set.md case 24.
+
+    "so_cau_con_thieu" — CHỈ là gợi ý số lượng cho prompt (dùng khi gọi lặp nhiều vòng qua
+    expand_script_to_target()), None nếu gọi đơn lẻ như cũ (hành vi /expand-script không đổi).
+    Đây KHÔNG phải ràng buộc bắt buộc — prompt vẫn nói rõ thà thêm ít hơn/không thêm gì còn hơn
+    lặp ý, không nới lỏng an toàn để cố đạt đúng số gợi ý này."""
     original_cau = kich_ban.get("cau", [])
     if not original_cau:
         return kich_ban
+
+    goi_y_so_luong = ""
+    if so_cau_con_thieu is not None:
+        goi_y_so_luong = (
+            f"\nGỢI Ý SỐ LƯỢNG (không bắt buộc): kịch bản còn thiếu khoảng {so_cau_con_thieu} câu "
+            "nữa so với thời lượng mong muốn. Đây CHỈ là gợi ý — nếu không còn đủ ý minh hoạ mới thực "
+            "sự khác biệt, hãy thêm ít hơn con số này, kể cả 0 câu, còn hơn lặp lại ý đã có.\n"
+        )
 
     try:
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": EXPAND_SCRIPT_PROMPT.format(
-                kich_ban_json=json.dumps(original_cau, ensure_ascii=False))}],
+                kich_ban_json=json.dumps(original_cau, ensure_ascii=False),
+                goi_y_so_luong=goi_y_so_luong)}],
             response_format={"type": "json_object"},
         )
         parsed = json.loads(resp.choices[0].message.content)
@@ -409,12 +423,20 @@ def expand_script_with_analogy(kich_ban: dict) -> dict:
         if not original_loi_set.issubset(expanded_loi_set):
             return kich_ban
 
-        # Guard 2: câu MỚI (không có trong bản gốc) phải "nguon": [] và không chữ số trong "loi"
+        # Guard 2: câu MỚI (không có trong bản gốc) phải "nguon": [] và không chữ số trong "loi".
+        # Guard 2b (thêm sau khi phát hiện thật ở lần test gọi lặp nhiều vòng — xem
+        # expand_script_to_target(): sau vài vòng, AI thỉnh thoảng nhét cả câu lời đọc vào field
+        # "kieu" và bỏ trống "loi" hẳn — không phải lỗi trích dẫn/số liệu nên 2 guard trên không
+        # bắt được, nhưng vẫn là dữ liệu hỏng (câu không có lời đọc thật) — chặn luôn ở đây.
         for c in expanded_cau:
             if c.get("loi") not in original_loi_set:
                 if _as_list(c.get("nguon")):
                     return kich_ban
                 if c.get("loi") and re.search(r"\d", c["loi"]):
+                    return kich_ban
+                if not c.get("loi"):
+                    return kich_ban
+                if c.get("kieu") not in {"ke", "giang", "nhe", "hoi", "nhan"}:
                     return kich_ban
 
         new_kich_ban = dict(kich_ban)
@@ -422,6 +444,53 @@ def expand_script_with_analogy(kich_ban: dict) -> dict:
         return new_kich_ban
     except Exception:
         return kich_ban
+
+
+def expand_script_to_target(kich_ban: dict, target_sentences: int, max_rounds: int = 8) -> dict:
+    """Gọi LẶP expand_script_with_analogy() nhiều vòng, mỗi vòng lấy kết quả vòng trước làm input
+    vòng sau — vì 1 lần expand chỉ thêm được ~5-6 câu, không đủ để kịch bản ngắn (3-7 câu gốc, do
+    slide mẫu ít chất liệu — xem golden-set.md case 24) đạt gần target_sentences (từ
+    estimate_target_sentences(), ví dụ ~34 câu cho 4 phút).
+
+    3 điều kiện dừng bắt buộc (an toàn, không được nới lỏng):
+    1. Đã chạy đủ max_rounds vòng.
+    2. Một vòng KHÔNG tăng thêm câu nào — nghĩa là guard trong expand_script_with_analogy() đã
+       chặn (AI sửa câu gốc/câu mới vi phạm luật) hoặc AI tự thấy hết ý mới nên trả lại y nguyên —
+       dừng ngay, KHÔNG cố gọi lại vô ích.
+    3. Đã đạt/vượt target_sentences.
+
+    KHÔNG đụng tới bất kỳ guard an toàn nào của expand_script_with_analogy() — hàm này chỉ điều
+    phối việc gọi lặp, không nới lỏng luật "không trích dẫn/không số liệu/không sự kiện mới/giữ
+    nguyên câu gốc" đã có."""
+    current = kich_ban
+    rounds_run = 0
+    stopped_reason = "max-rounds"
+
+    for round_idx in range(1, max_rounds + 1):
+        so_cau_hien_tai = len(current.get("cau", []))
+        if so_cau_hien_tai >= target_sentences:
+            stopped_reason = "target-reached"
+            break
+
+        so_cau_con_thieu = target_sentences - so_cau_hien_tai
+        expanded = expand_script_with_analogy(current, so_cau_con_thieu=so_cau_con_thieu)
+        rounds_run = round_idx
+
+        if len(expanded.get("cau", [])) <= so_cau_hien_tai:
+            # Điều kiện dừng #2 — guard đã chặn hoặc AI hết ý mới, không tăng câu nào lần này.
+            stopped_reason = "no-progress"
+            break
+
+        current = expanded
+
+    current = dict(current)
+    current["_expandMeta"] = {
+        "soVongDaChay": rounds_run,
+        "lyDoDung": stopped_reason,
+        "soCauCuoi": len(current.get("cau", [])),
+        "soCauMucTieu": target_sentences,
+    }
+    return current
 
 
 @app.post("/qa-content")
@@ -737,6 +806,32 @@ async def expand_script_endpoint(kich_ban_json: str = Form(...)):
     expanded = expand_script_with_analogy(kich_ban)
     da_mo_rong = len(expanded.get("cau", [])) > len(kich_ban.get("cau", []))
     return {"kichBan": expanded, "daMoRong": da_mo_rong}
+
+
+@app.post("/expand-script-full")
+async def expand_script_full_endpoint(
+    kich_ban_json: str = Form(...),
+    duration: int = Form(...),
+):
+    """Endpoint MỚI, riêng khỏi /expand-script (giữ nguyên hành vi cũ, gọi đúng 1 lần) — dùng
+    expand_script_to_target() để gọi LẶP nhiều vòng, cố đạt gần estimate_target_sentences(duration)
+    câu thay vì chỉ +5-6 câu như 1 lần expand. Trả kèm "_expandMeta" (số vòng đã chạy, lý do dừng)
+    để UI/người gọi biết thật sự đã cố tới đâu, không chỉ báo "đã mở rộng" mập mờ."""
+    kich_ban = json.loads(kich_ban_json)
+    target = estimate_target_sentences(duration)
+    so_cau_ban_dau = len(kich_ban.get("cau", []))
+    expanded = expand_script_to_target(kich_ban, target_sentences=target)
+    meta = expanded.pop("_expandMeta", {})
+    da_mo_rong = len(expanded.get("cau", [])) > so_cau_ban_dau
+    return {
+        "kichBan": expanded,
+        "daMoRong": da_mo_rong,
+        "soCauBanDau": so_cau_ban_dau,
+        "soCauMucTieu": target,
+        "soCauCuoi": len(expanded.get("cau", [])),
+        "soVongDaChay": meta.get("soVongDaChay", 0),
+        "lyDoDung": meta.get("lyDoDung", ""),
+    }
 
 
 # Static files (frontend) — MOUNT SAU CÙNG, sau mọi route API, để không nuốt mất /generate

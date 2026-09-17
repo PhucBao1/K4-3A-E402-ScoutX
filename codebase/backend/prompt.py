@@ -266,15 +266,42 @@ Trả về ĐÚNG JSON, không thêm chữ nào khác:
 """
 
 EXPAND_SCRIPT_PROMPT = """Bạn nhận một kịch bản ĐÃ ĐÚNG CHUẨN, mỗi câu đã có trích dẫn nguồn thật hoặc là
-câu chuyển ý — nhiệm vụ CHỈ là chèn thêm câu MỚI xen giữa để kéo dài kịch bản theo phong cách 3Blue1Brown
-(dùng ví dụ minh hoạ/liên hệ/giải thích ý nghĩa GIẢ ĐỊNH, không phải thêm sự thật cụ thể mới) — TUYỆT ĐỐI
-KHÔNG được sửa bất kỳ chữ nào trong các câu đã có, chỉ được CHÈN THÊM câu mới.
+câu chuyển ý — nhiệm vụ CHỈ là chèn thêm câu MỚI xen giữa để kéo dài kịch bản theo ĐÚNG phong cách giảng
+giải của kênh 3Blue1Brown (Grant Sanderson) — không phải "thêm ví dụ minh hoạ chung chung cho có", mà là
+XÂY DỰNG TRỰC GIÁC thật sự. TUYỆT ĐỐI KHÔNG được sửa bất kỳ chữ nào trong các câu đã có, chỉ được CHÈN
+THÊM câu mới.
 
+PHONG CÁCH 3BLUE1BROWN CẦN ÁP DỤNG (cả 3 điều dưới, không chỉ ví dụ minh hoạ rời rạc):
+1. TRẢ LỜI "TẠI SAO", không chỉ "LÀ GÌ" — câu minh hoạ không chỉ lặp lại ý đã nêu bằng từ khác, mà phải
+   giúp người nghe hiểu VÌ SAO điều đó lại đúng/lại quan trọng, cơ chế đằng sau nó vận hành thế nào (ở mức
+   giả định/khái quát, không cần số liệu/sự kiện cụ thể mới).
+2. DÙNG MỘT VÍ DỤ/PHÉP LIÊN TƯỞNG XUYÊN SUỐT (running analogy) — CHỌN một hình ảnh liên tưởng duy nhất phù
+   hợp với chủ đề rồi PHÁT TRIỂN DẦN nó qua nhiều câu, thay vì mỗi câu minh hoạ một ví dụ rời rạc, không
+   liên quan tới nhau. Đây đúng là bí quyết kịch bản mẫu chính thức của BTC dùng để đạt độ dài: một ví dụ
+   giả định duy nhất, dùng lại xuyên suốt để giải thích từng khái niệm. QUAN TRỌNG cho việc gọi nhiều lượt
+   liên tiếp: đọc kỹ các câu "nguon": [] ĐÃ CÓ SẴN trong kịch bản đầu vào (có thể là câu minh hoạ từ (các)
+   lượt mở rộng trước) — nếu chúng đã thiết lập sẵn 1 ví dụ liên tưởng, PHẢI TIẾP TỤC PHÁT TRIỂN đúng ví dụ
+   đó (thêm chi tiết/khía cạnh mới của cùng ví dụ) cho khái niệm đang giải thích, KHÔNG được bịa một ví dụ
+   liên tưởng hoàn toàn khác mỗi lượt — chỉ đổi sang ví dụ mới nếu ví dụ cũ thực sự không thể áp dụng hợp lý
+   cho khái niệm đang nói tới.
+3. DẪN DẮT BẰNG CÂU HỎI — ưu tiên đặt 1 câu hỏi gợi mở trước khi giải thích, để người nghe tự suy luận ra
+   hướng trả lời, thay vì chỉ phát biểu khẳng định khô khan liên tục.
+
+QUAN TRỌNG (chống lặp ý) — kịch bản đầu vào có thể đã từng được mở rộng ở (các) lượt trước. Đọc kỹ TOÀN BỘ
+các câu "nguon": [] đã có sẵn trước khi viết — TUYỆT ĐỐI KHÔNG được lặp lại cùng một ý giải thích/khía cạnh
+của ví dụ liên tưởng dưới hình thức diễn đạt khác (lỗi thật hay gặp sau nhiều lượt mở rộng liên tiếp: hết ý
+mới nên bắt đầu diễn đạt lại ý cũ bằng câu chữ khác). Nếu không còn khía cạnh MỚI, KHÁC BIỆT nào của ví dụ
+liên tưởng (hoặc của trực giác "tại sao") để phát triển thêm, hãy trả về ÍT câu mới hơn dự kiến, thậm chí
+KHÔNG thêm câu nào cả (chỉ trả lại nguyên câu gốc) — thà kịch bản ngắn hơn còn hơn lặp ý nhàm chán.
+{goi_y_so_luong}
 Mỗi câu MỚI phải:
 - "nguon": [] LUÔN (không được trích dẫn nguồn nào, vì đây là ví dụ giả định, không phải sự thật cần nguồn)
-- KHÔNG chứa bất kỳ số liệu, tên riêng cụ thể, hay sự kiện cụ thể nào — chỉ giải thích ý nghĩa hoặc dùng ví
-  dụ minh hoạ chung chung (vd: "giống như...", "hãy tưởng tượng...", "điều này có nghĩa là...")
+- KHÔNG chứa bất kỳ số liệu, tên riêng cụ thể, hay sự kiện cụ thể nào — chỉ giải thích ý nghĩa/trực giác
+  hoặc phát triển ví dụ liên tưởng chung chung (vd: "giống như...", "hãy tưởng tượng...", "điều này có
+  nghĩa là...", "vậy tại sao lại như vậy?...")
 - KHÔNG chứa chữ số trong "loi" (máy đọc thành tiếng — nếu bắt buộc phải nhắc số thì viết bằng chữ)
+- PHẢI có "loi" (lời đọc thật, không được để trống/thiếu) và "kieu" phải là đúng 1 trong 5 giá trị:
+  "ke"/"giang"/"nhe"/"hoi"/"nhan" — TUYỆT ĐỐI không nhét nội dung câu vào trường "kieu"
 - "chuTrenManHinh" tối đa 40 ký tự, "yDoHinh" mô tả ngắn hình minh hoạ phù hợp
 
 Kịch bản gốc, mỗi câu có n/phan/loi/chuTrenManHinh/yDoHinh/nguon (JSON):
@@ -283,4 +310,79 @@ Kịch bản gốc, mỗi câu có n/phan/loi/chuTrenManHinh/yDoHinh/nguon (JSON
 Trả về ĐÚNG JSON, không thêm chữ nào khác: {{"cauMoRong": [<TOÀN BỘ câu theo đúng thứ tự cuối cùng, gồm cả
 câu gốc (giữ NGUYÊN VĂN 100% mọi trường, kể cả "nguon") lẫn câu mới chèn thêm, đánh lại "n" tăng dần liên
 tục từ 1 cho cả kịch bản sau khi chèn>]}}
+"""
+
+HYPERFRAMES_SCENE_PROMPT = """Bạn là nhà thiết kế motion graphics cho video bài giảng, dùng HyperFrames
+(HTML/CSS + GSAP timeline, canvas 1920x1080). Thiết kế 1 CẢNH cho đúng 1 câu kịch bản dưới đây.
+
+QUAN TRỌNG NHẤT — hình ảnh phải THỰC SỰ MINH HOẠ đúng cơ chế/khái niệm đang nói, KHÔNG được là hình
+trang trí chung chung (cấm: hình tròn/khối màu không mang ý nghĩa, icon ngẫu nhiên không liên quan trực
+tiếp tới nội dung câu này). Đọc kỹ "loi" + "yDoHinh" rồi CHỌN ĐÚNG 1 kiểu sơ đồ khớp với ý đang nói:
+- Nếu nói về CẮT NHỎ một thứ thành nhiều phần (VD: cắt văn bản thành token) → vẽ 1 dải chữ/khối dài, có
+  các đường phân cách chia nó thành từng ô nhỏ rời nhau, mỗi ô có thể có nhãn.
+  Không cần theo cụ thể ví dụ này. Đây chỉ là ví dụ cho quy tắc "khớp với ý đang nói".
+- Nếu nói về 1 phần tử NHÌN LẠI/liên kết ngược các phần tử trước đó (VD: attention) → vẽ dãy ô vuông nối
+  tiếp theo hàng ngang, có mũi tên cong nối từ ô cuối tới các ô trước đó.
+- Nếu nói về QUY TRÌNH nhiều bước nối tiếp → vẽ các ô đánh số 1-2-3 nối bằng mũi tên ngang.
+- Nếu nói về SO SÁNH 2 khái niệm/2 giai đoạn → chia đôi màn hình trái/phải, mỗi bên 1 nhãn + đặc điểm.
+- Nếu nói về GIỚI HẠN/PHẠM VI cố định (VD: context có hạn) → vẽ 1 khung/viền rõ ràng bao quanh một vùng
+  chữ, phần chữ ngoài khung mờ đi hoặc bị cắt, thể hiện rõ "trong khung" vs "ngoài khung".
+- Nếu có SỐ LIỆU/xu hướng tăng giảm theo thời gian → vẽ biểu đồ cột hoặc đường thật, có animate chiều cao/
+  độ dài theo đúng chiều tăng giảm được mô tả.
+- Nếu không khớp mẫu nào ở trên, tự nghĩ ra 1 sơ đồ ĐƠN GIẢN nhưng THỂ HIỆN ĐÚNG cơ chế cụ thể trong câu
+  (vẽ bằng các thẻ div/CSS shape hoặc SVG đơn giản, không cần đẹp cầu kỳ, ưu tiên ĐÚNG NGHĨA hơn ĐẸP).
+Tiêu đề + phụ đề chữ vẫn cần có (không bỏ), nhưng sơ đồ minh hoạ mới là trọng tâm cảnh, đặt chỗ nổi bật.
+
+Chữ trên màn hình (bắt buộc dùng ĐÚNG NGUYÊN VĂN, không paraphrase, không rút gọn):
+- Tiêu đề: "{chu_tren_man_hinh}"
+- Phụ đề/lời đọc: "{loi}"
+Ý đồ hình ảnh (mô tả cơ chế cần vẽ — đọc kỹ, đây là thứ quan trọng nhất để chọn đúng sơ đồ): {y_do_hinh}
+Thời lượng cảnh: {duration} giây.
+
+PHONG CÁCH HÌNH ẢNH: dựng theo đúng cảm giác kênh 3Blue1Brown (Grant Sanderson)/thư viện Manim — nền GẦN
+ĐEN sang trọng, hình học tối giản (đường nét mảnh, ít chi tiết thừa), không dùng gradient sặc sỡ hay bóng đổ
+nặng, mọi thứ trông như đang được "vẽ tay" trên bảng đen kỹ thuật số chứ không phải slide phẳng.
+
+BẢNG MÀU BẮT BUỘC (không dùng màu khác): nền GẦN ĐEN #0A0A0F · chữ chính trắng ngà #F5F5F5 · accent xanh
+"Manim" #58C4DD (dùng cho đường/hình khối/nhãn phụ — màu chủ đạo của mọi sơ đồ) · accent vàng #FFC857 CHỈ
+dùng để nhấn 1-2 TỪ KHOÁ quan trọng nhất trong câu (không tô cả câu, không lạm dụng) · chữ phụ xám nhạt
+#B7B7C2. Nếu cần 1 khối/thẻ có nền riêng khác nền chính (vd 1 ô/card), dùng #16161F (đen hơi sáng hơn nền
+chính một chút, không dùng màu navy/xanh). Font: 'Space Grotesk' cho tiêu đề/số liệu, 'IBM Plex Sans' cho
+nội dung (cả 2 đã load sẵn, chỉ cần dùng font-family, không cần thêm link).
+QUY TẮC TƯƠNG PHẢN (WCAG AA, bắt buộc, hay sai nhất — đã từng bị huỷ vì lỗi này): #58C4DD và #FFC857 CHỈ
+được dùng làm màu CHỮ, đường SVG (stroke), hoặc viền — TRÊN NỀN TỐI (#0A0A0F hoặc #16161F) tương phản đạt
+~9.7:1 và ~12.8:1, đạt chuẩn. TUYỆT ĐỐI KHÔNG dùng #58C4DD hoặc #FFC857 làm background-color của 1 khối
+rồi đặt chữ trắng/#F5F5F5 lên trên (tương phản chỉ ~1.4-1.9:1, KHÔNG đạt 4.5:1 bắt buộc, sẽ bị huỷ ngay).
+Nếu bắt buộc phải tô nền đặc bằng 1 trong 2 màu đó (vd 1 nhãn/badge nhỏ nổi bật), chữ bên trong PHẢI là màu
+tối #0A0A0F (tương phản ~9.7:1 hoặc ~12.8:1, đạt chuẩn) — KHÔNG dùng chữ sáng trên nền màu.
+
+HOẠT ẢNH "VẼ DẦN" (QUAN TRỌNG — đây là đặc trưng nhận diện phong cách này, ưu tiên hơn fade/scale đơn
+giản): với MỌI đường kẻ/mũi tên/khung/biểu đồ đường, ƯU TIÊN vẽ bằng SVG <path> hoặc <line>/<polyline> có
+"stroke" (không "fill") rồi animate hiệu ứng tự vẽ ra bằng stroke-dasharray/stroke-dashoffset, ví dụ:
+  - Trong CSS/HTML: đặt cho path 1 "stroke-dasharray" bằng đúng độ dài đường (ước lượng, vd 1000) và
+    "stroke-dashoffset" cùng giá trị đó (để ẩn toàn bộ đường lúc đầu).
+  - Trong "gsap": tl.fromTo("#idPath", {{strokeDashoffset: 1000}}, {{strokeDashoffset: 0, duration: 1.2,
+    ease: "power2.inOut"}}, <thời điểm>) — làm đường "tự vẽ ra" dần từ đầu tới cuối.
+Với các khối/hình cần xuất hiện hoặc biến đổi (không phải đường vẽ), ƯU TIÊN animate transform (scale/
+rotate/translate) mượt bằng ease "power2.inOut" hoặc "power1.out" thay vì chỉ opacity fade-in/scale-in đơn
+điệu — ví dụ 1 hình vuông morph thành hình tròn (border-radius animate), hoặc 1 mũi tên "bay" dọc theo
+đường đã vẽ xong. Text vẫn có thể dùng opacity/y đơn giản, nhưng SƠ ĐỒ CHÍNH của cảnh bắt buộc phải có ít
+nhất 1 hiệu ứng "vẽ dần" (stroke-dashoffset) hoặc biến hình mượt, không được chỉ fade-in/scale-in tĩnh.
+
+RÀNG BUỘC KỸ THUẬT (vi phạm sẽ bị huỷ, dùng bản mẫu an toàn thay thế):
+- Chỉ trả về NỘI DUNG BÊN TRONG thẻ #root (các thẻ div/p/h1/svg...), KHÔNG trả về <html>/<head>/<body>/<script>.
+- Mọi phần tử có hoạt ảnh timing phải có class="clip" data-start="0" data-duration="{duration}".
+- Toạ độ phải nằm trong khung 1920x1080 (dùng position:absolute với left/top/width/height hợp lý, chừa lề
+  ít nhất 96px mỗi cạnh).
+- Text tiêu đề và phụ đề ở trên PHẢI xuất hiện nguyên văn đâu đó trong HTML (không đổi chữ, không bịa thêm
+  chữ mới ngoài 2 câu đó và các nhãn/số liệu đã có sẵn trong câu).
+- KHÔNG dùng Math.random(), Date.now(), fetch, hay bất kỳ nguồn ngẫu nhiên/không xác định nào.
+- KHÔNG dùng ảnh/video/font URL bên ngoài nào khác.
+
+Trả về ĐÚNG JSON, không thêm chữ nào khác:
+{{"html": "<...các thẻ bên trong #root, escape đúng JSON, ưu tiên có <svg><path stroke=\\"#58C4DD\\"
+  stroke-dasharray=\\"1000\\" stroke-dashoffset=\\"1000\\" fill=\\"none\\" .../></svg> cho phần đường vẽ...>",
+  "gsap": ["tl.fromTo(\\"#pathId\\", {{strokeDashoffset:1000}}, {{strokeDashoffset:0,duration:1.2,ease:\\"power2.inOut\\"}}, 0)", "tl.fromTo(\\"#id\\", {{opacity:0}}, {{opacity:1,duration:0.5}}, 0)", "..."]}}
+"gsap" là mảng các dòng lệnh GSAP (timeline đã có sẵn tên "tl", KHÔNG khai báo lại), mỗi dòng 1 lệnh
+tl.to/tl.from/tl.fromTo hợp lệ, thời điểm bắt đầu tuyệt đối theo giây trong khoảng [0, {duration}].
 """

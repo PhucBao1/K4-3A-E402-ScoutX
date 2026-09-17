@@ -321,3 +321,30 @@ case biên (thời lượng quá ngắn so với nội dung). Nếu chạy lại
 có thể thấp hơn 70% (nếu case 4/9/6 rơi vào lần thử xấu) hoặc bằng/cao hơn (nếu may mắn). **Chưa làm, để lại
 trước CP6:** 1 lượt chạy sạch toàn bộ 20 case liền mạch (không retry riêng lẻ) để có con số thật sự đại
 diện cho tỷ lệ pass ổn định của hệ thống, thay vì con số tốt nhất quan sát được qua nhiều lần thử rời rạc.
+
+## Case 31 — thử kéo kịch bản đạt ĐÚNG số câu mục tiêu theo thời lượng (sau CP4, bonus, chưa đạt trọn vẹn)
+
+Case 26 chứng minh `/expand-script` (1 lượt) hoạt động an toàn nhưng mỗi lần chỉ thêm ~5-6 câu — không đủ
+để kịch bản 5-7 câu gốc đạt gần ~34 câu cần cho 4 phút (`estimate_target_sentences()`). Thử gọi LẶP hàm
+này nhiều vòng (`expand_script_to_target()`, endpoint mới `/expand-script-full`, dừng khi đạt target/hết
+`max_rounds`/1 vòng không tăng câu nào), đồng thời nâng chất lượng câu minh hoạ theo đúng phong cách
+3Blue1Brown (xây trực giác "tại sao", 1 ví dụ liên tưởng xuyên suốt phát triển dần, dẫn dắt bằng câu hỏi).
+
+**Kết quả test thật** (chủ đề "Lịch sử phát triển AI", d1, 4 phút, target 34 câu, kịch bản gốc 5 câu):
+- Lần 1: 5→14 câu (4 vòng, dừng vì `no-progress`) · Lần 2: 5→20 câu (3 vòng, dừng vì `no-progress`).
+- **KHÔNG đạt target 34 câu (chỉ 41-59%).** Nguyên nhân xác nhận thật: từ vòng 3-4, gpt-4o-mini bắt đầu
+  nhét lời đọc vào field `"kieu"` và bỏ trống `"loi"` cho phần lớn câu mới (lỗi hỏng schema, không phải
+  bịa số liệu) — đây là **độ tin cậy JSON của model giảm dần theo số vòng/độ dài input**, không phải hết ý
+  nội dung. Đã thêm **Guard 2b** chặn đúng lỗi này (câu thiếu `loi` hoặc `kieu` sai giá trị → rớt về bản
+  trước), nên không bao giờ trả dữ liệu hỏng, nhưng cái giá là dừng sớm hơn nhiều so với target.
+- Phong cách 3Blue1Brown: có cải thiện thật (nhiều câu dùng khung "Tại sao... lại quan trọng?" trước khi
+  giải thích cơ chế), nhưng **chưa đạt "1 ví dụ xuyên suốt toàn bài"** — model chọn 1 ví dụ liên tưởng
+  RIÊNG cho từng khái niệm (dữ liệu ~ "nhiên liệu", Transformer ~ "chia việc song song", ChatGPT ~ "người
+  bạn trò chuyện") rồi phát triển nhất quán TRONG PHẠM VI khái niệm đó, không nối 1 ví dụ duy nhất qua cả
+  3 khái niệm rất khác nhau như kịch bản mẫu BTC. Cũng thấy dấu hiệu lặp KHUNG câu hỏi ("Vậy điều gì khiến
+  X quan trọng?") dù không lặp Ý — có thể đơn điệu nếu kéo dài thêm nhiều vòng nữa.
+
+**Quyết định:** không nới lỏng Guard 2b để cố đạt đủ 34 câu — giữ đúng nguyên tắc "an toàn hơn đủ số câu"
+đã thống nhất từ case 24. Chấp nhận kịch bản ngắn hơn mục tiêu thật (14-20/34 câu) hơn là có câu hỏng dữ
+liệu lọt ra ngoài. Hướng chưa thử (để lại): đổi model bước expand sang model khác gpt-4o-mini để giảm lỗi
+schema, hoặc giới hạn cứng 2-3 câu/vòng thay vì để AI tự quyết số lượng mỗi lần.
