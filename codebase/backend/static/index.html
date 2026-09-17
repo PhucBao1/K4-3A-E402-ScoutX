@@ -275,8 +275,8 @@
     </div>
 
     <div id="qaContentSection" style="display:none; margin-top:16px; border-top:1px solid #ddd; padding-top:12px;">
-      <h3 style="margin-top:0;">🔍 QA nội dung video (Feature B — thử nghiệm, xem BA.md)</h3>
-      <p style="font-size:0.9em;color:#666;">Sửa cột "Lời trong video" để giả lập video thật đã dựng khác kịch bản (đọc nhầm, đổi số liệu...), rồi bấm kiểm tra. AI sẽ so ngữ nghĩa từng câu, gắn nhãn khớp/lệch nhẹ/lệch nội dung.</p>
+      <h3 style="margin-top:0;">🔍 QA nội dung: kiểm tra AI có phát hiện được lệch không? (Feature B — thử nghiệm, xem BA.md)</h3>
+      <p style="font-size:0.9em;color:#666;">⚠️ Đây là bài test giả lập, KHÔNG phải đối chiếu với video thật vừa dựng — video TTS ở trên đọc đúng y hệt kịch bản nên không có gì để so. Mục đích: giả sử sau này có người đọc thật (hoặc TTS khác) lỡ đọc SAI đi so với bản đã duyệt, AI có bắt được không? Hãy tự sửa cột "Lời trong video" bên dưới thành một câu SAI LỆCH (đổi số liệu, đổi ý...) rồi bấm kiểm tra để xem AI phát hiện đúng không.</p>
       <div id="qaContentRows"></div>
       <button class="primary" id="qaContentCheckBtn" style="margin-top:8px;">Kiểm tra đối chiếu</button>
       <div id="qaContentResults" style="margin-top:10px;"></div>
@@ -699,7 +699,7 @@ function renderQaContentRows() {
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; align-items:start;">
       <div><label style="font-size:0.8em;color:#666;">Câu ${c.n} — đã duyệt</label>
         <div style="padding:6px;background:#f5f5f5;border-radius:4px;">${escapeHtml(c.loi)}</div></div>
-      <div><label style="font-size:0.8em;color:#666;">Lời trong video (sửa để giả lập lệch)</label>
+      <div><label style="font-size:0.8em;color:#666;">Thử sửa thành câu SAI để test AI (giả định người đọc/video lỡ đọc thế này)</label>
         <input type="text" class="qa-video-line" data-n="${c.n}" value="${escapeHtml(c.loi)}" style="width:100%;"></div>
     </div>`).join('');
 }
