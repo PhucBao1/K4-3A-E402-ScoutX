@@ -316,15 +316,23 @@ def build_ai_scene_html(cau: dict, ai_content: dict, duration: float) -> str:
     )
 
 
-def validate_scene(project_dir: str) -> bool:
-    """Chạy hyperframes check (lint + runtime JS thật + layout + contrast) — trả False nếu
-    AI viết code JS lỗi/hỏng bố cục, để nơi gọi rớt về bản mẫu an toàn thay vì render ra
-    video hỏng."""
+def check_scene(project_dir: str) -> dict:
+    """Chạy `hyperframes check --json` (đầy đủ browser: lint+runtime+layout+motion+contrast).
+    KHÁC lint_scene(): mỗi mục con (lint/runtime/layout/motion/contrast) đều có "findings" CÙNG
+    CẤU TRÚC (code/message/selector/fixHint) — nhiều lỗi thật (tràn khung, tương phản, JS runtime)
+    CHỈ xuất hiện ở đây, lint tĩnh không thấy được. Trả {"ok": bool, "findings": [...đã gộp...]}."""
     result = subprocess.run(
-        [_bin_path("hyperframes"), "check", project_dir],
-        capture_output=True, env=_run_env(),
+        [_bin_path("hyperframes"), "check", project_dir, "--json"],
+        capture_output=True, env=_run_env(), text=True,
     )
-    return result.returncode == 0
+    try:
+        data = json.loads(result.stdout)
+    except (json.JSONDecodeError, ValueError):
+        return {"ok": result.returncode == 0, "findings": []}
+    findings = []
+    for section in ("lint", "runtime", "layout", "motion", "contrast"):
+        findings.extend(data.get(section, {}).get("findings", []))
+    return {"ok": data.get("ok", False), "findings": findings}
 
 
 def lint_scene(project_dir: str) -> dict:
@@ -404,11 +412,12 @@ def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
         duration = float(cau.get("dungGiay", SILENCE_DEFAULT_SEC))
         make_silence(audio_path, duration)
 
-    # Vòng tự-sửa (nhanh hơn hẳn retry-mù trước đây): mỗi vòng sinh mới (tối đa 2 vòng), sau khi
-    # có bản thiết kế thì dùng `lint --json` (~1.3s, không mở trình duyệt) để lấy lỗi THẬT, cho AI
-    # vá đúng chỗ sai (tối đa 2 lần vá/vòng) thay vì đoán lại từ đầu. Chỉ tốn `check` đầy đủ
-    # (~6.7s, có trình duyệt) làm cổng cuối cùng SAU KHI lint đã sạch — không chạy check ở mỗi
-    # bước lint như bản cũ, giảm đáng kể số lần phải mở trình duyệt.
+    # Vòng tự-sửa 2 tầng (nhanh + giữ được thiết kế đẹp thay vì bỏ đi sinh lại từ đầu):
+    # Tầng 1 — lint --json (~1.3s, không mở trình duyệt): vá nhanh lỗi cấu trúc/GSAP tĩnh.
+    # Tầng 2 — check --json (~6.7s, có trình duyệt) SAU KHI lint sạch: bắt lỗi runtime/layout/
+    # contrast mà lint tĩnh không thấy được (đa số lỗi thật nằm ở đây, không phải lint — quan sát
+    # thật khi test) — feed đúng finding thật (code/message/fixHint) cho AI vá, KHÔNG bỏ thiết kế
+    # đi sinh lại mù như bản cũ. Chỉ sinh lại từ đầu khi vá hết số lần cho phép vẫn còn lỗi.
     index_path = os.path.join(project_dir, "index.html")
     used_ai_scene = False
     for gen_round in range(2):
@@ -436,10 +445,24 @@ def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
             print(f"[HyperFrames] Cảnh {n}: vòng sinh {gen_round + 1} vẫn còn lỗi lint, thử sinh lại...")
             continue
 
-        if validate_scene(project_dir):
+        check_result = check_scene(project_dir)
+        for fix_attempt in range(2):
+            if check_result.get("ok"):
+                break
+            findings = check_result.get("findings", [])
+            print(f"[HyperFrames] Cảnh {n}: check thấy {len(findings)} lỗi, cho AI vá lần {fix_attempt + 1}...")
+            fixed = fix_ai_scene(cau, duration, ai_content, findings)
+            if fixed is None:
+                break
+            ai_content = fixed
+            with open(index_path, "w", encoding="utf-8") as f:
+                f.write(build_ai_scene_html(cau, ai_content, duration))
+            check_result = check_scene(project_dir)
+
+        if check_result.get("ok"):
             used_ai_scene = True
             break
-        print(f"[HyperFrames] Cảnh {n}: qua lint nhưng check đầy đủ vẫn fail (vòng {gen_round + 1}), thử sinh lại...")
+        print(f"[HyperFrames] Cảnh {n}: vòng sinh {gen_round + 1} vá hết lượt vẫn còn lỗi check, thử sinh lại...")
     if not used_ai_scene:
         print(f"[HyperFrames] Cảnh {n}: hết các vòng thử, dùng bản mẫu an toàn.")
         with open(index_path, "w", encoding="utf-8") as f:
