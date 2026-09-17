@@ -4,7 +4,6 @@
 
 > ⚠️ Spec đang ở trạng thái **nháp CP3, chưa chốt** — các mục đánh dấu `TODO` cần hoàn thiện trước hạn chốt spec (21:00 17/9, CP4). Khai thiếu ở đây không bị trừ điểm theo luật chung; giấu/bịa mới bị.
 
-```markdown
 # AI SPEC — ScriptScout · Nhóm ScoutX · Zone E402
 Hướng: [ ] A — VLearn  [ ] B — Trợ lý Học viên  [x] C — Làn mở *(cụ thể: Track C — Lesson Studio, Đề C3 ScriptScout, theo 5-track scheme của sự kiện — không khớp hoàn toàn 3 lựa chọn gốc nên tick gần đúng nhất)*
 Loại: [ ] Tối ưu tính năng có sẵn  [x] Tính năng mới
@@ -151,4 +150,3 @@ tường minh, không phải thêm validate số liệu).
 | CP3 (17/9, khuya) | Thêm đối chiếu chéo slide↔web: mỗi `thongTin` có `soNguonXacNhan`/`trangThai` ("da-xac-minh" nếu ≥2 nguồn độc lập, "chua-xac-minh" nếu chỉ 1) + `moTaMauThuan` nếu 2 nguồn nói khác nhau. Thêm Layer 5 chặn AI tự khai khống số nguồn xác nhận | Đúng yêu cầu "chỗ khó nhất" của đề C3 gốc: "số liệu quan trọng cần ít nhất 2 nguồn độc lập xác nhận, nếu không phải đánh dấu chưa kiểm chứng" — trước đó nhóm chưa làm phần này dù đã có cả slide lẫn web. Test thật: AI tự xác minh đúng, không khai khống |
 | CP3 (17/9, khuya) | Tăng số lần retry `/generate` từ 2 lên 3 + nhấn mạnh rõ hơn trong prompt "mọi nguonId trong bangChung phải có nguồn tương ứng" | Test thật cho thấy lỗi cấu trúc ID (nguonId không tồn tại) xảy ra khá thường xuyên (2/2 lần liên tiếp có lúc) từ khi prompt phức tạp hơn — sau khi sửa, 2/2 lần test lại đều thành công |
 | CP3 (17/9, khuya) | Dặn AI chủ động đối chiếu NHIỀU TRANG slide khác nhau trước khi cần tới nguồn web (không chỉ dừng ở trang đầu tiên gặp) | Theo góp ý: nên tận dụng chính nhiều trang trong slide để xác minh chéo, không chỉ trông chờ nguồn web. **Test thật cho thấy giới hạn:** dù đã nhấn mạnh trong prompt, AI vẫn có lúc chỉ trích 1 nguồn dù có nguồn khác liên quan sẵn có — đây là giới hạn hành vi model (không phải bug code), Layer 5 vẫn đúng khi báo "chưa xác minh" trong trường hợp đó (không khai khống), nhưng tỷ lệ tận dụng chéo nguồn chưa cao như mong muốn. Chấp nhận giới hạn này, không tiếp tục vòng sửa prompt để ưu tiên thời gian cho CP3/CP4 |
-```
