@@ -30,8 +30,9 @@ Thời lượng dự kiến: {duration} phút
 
 ĐỘ DÀI KỊCH BẢN: thời lượng {duration} phút chỉ là ước lượng mong muốn, KHÔNG bắt buộc phải đạt đúng nếu
 nguồn không đủ chất liệu — thà kịch bản ngắn hơn dự kiến còn hơn lặp lại/diễn giải lại thông tin đã dùng
-rồi gắn nhầm cho nguồn khác để kéo dài. Ưu tiên tuyệt đối: mọi câu đều có căn cứ đúng nguồn, không bịa
-thêm hoặc gắn sai nguồn chỉ để đủ số câu.
+rồi gắn nhầm cho nguồn khác để kéo dài. Được phép thêm câu "nguon": [] (không cần trích dẫn) để giải thích
+ý nghĩa/liên hệ giữa các ý đã có, miễn KHÔNG nêu số liệu/tên riêng/sự kiện cụ thể mới trong câu đó. Ưu tiên
+tuyệt đối: mọi câu đều có căn cứ đúng nguồn, không bịa thêm hoặc gắn sai nguồn chỉ để đủ số câu.
 
 QUAN TRỌNG — kiểm tra phạm vi trước khi viết: Nếu "Mục tiêu bài học" ở trên KHÔNG liên quan gì tới nội
 dung trong CẢ HAI khối TEXT ở trên (ví dụ: mục tiêu hỏi về nấu ăn, thể thao, hay bất kỳ chủ đề nào không
