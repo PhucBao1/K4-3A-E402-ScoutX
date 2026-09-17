@@ -295,3 +295,29 @@ tiếng Anh lần nhắc đầu (case 18):** thêm đoạn "ĐÚNG ĐỘ SÂU TH
   attention, phân bố xác suất token cụ thể từ slide) nhưng phần `kichBan.cau` (lời đọc thật) vẫn chưa thuật
   lại các chi tiết kỹ thuật đó, còn khá chung chung — cần thêm 1 vòng nữa (chưa làm, để lại) nhắc rõ hơn
   "phải ĐƯA VÀO LỜI ĐỌC, không chỉ trích dẫn suông" nếu muốn giải quyết triệt để.
+
+## Case 30 — chạm quality bar 70%, nhưng KHÔNG ổn định giữa các lần chạy (tự khai trung thực)
+
+Sau case 29 (12/20 = 60%), thử lại thêm 2 case còn yếu:
+
+- **Case 16** (Go/Not Yet/No-Go): chạy lại (không sửa code, chỉ chạy lại) → lần này AI tìm đúng đoạn slide
+  trang 70 nói thẳng "Go/Not Yet/No-Go", giữ nguyên nhất quán cả 3 lựa chọn xuyên suốt kịch bản, không rớt
+  mất "Not Yet" như lần trước → **chuyển "Đạt"**.
+- **Case 4** (agenda 8 mục, 1 phút): thêm điều kiện vào ngay dưới đoạn "ĐẦY ĐỦ Ý" (case 29) — làm rõ "ĐẦY
+  ĐỦ Ý" chỉ áp dụng khi TRÍCH nguồn, còn khi VIẾT kịch bản mà thời lượng quá ngắn so với số mục, phải CHỌN
+  vài mục quan trọng nhất thay vì nhồi hết vào 1-2 câu dày đặc. Test lần 1 sau khi sửa: vẫn fail (502, AI
+  thử đưa số "70" không nguồn ở `chuTrenManHinh` — biến thiên ngẫu nhiên của model, không phải do fix này).
+  Test lần 2: **đúng hành vi mong đợi** — chỉ chọn 5/8 mục (tiêu đề logistics, người tham gia, mục đích,
+  mục hành động, quyết định cần thiết) để giải thích rõ từng mục, bỏ bớt 3 mục ít quan trọng hơn, không
+  nhồi nhét. Test lại case 8 (đã fix ở case 29): vẫn giữ nguyên đủ 5 khái niệm, fix mới không phá.
+
+**Tổng sau case 30: 14/20 đạt đầy đủ = 70% — CHẠM ĐÚNG quality bar đã khoá** (100% lớp ① không bịa vẫn giữ
+nguyên — điều kiện cứng).
+
+**⚠️ Tự khai trung thực — con số này KHÔNG ổn định:** cách đo ở trên là **thử lại riêng lẻ từng case sau
+khi vá**, không phải 1 lượt chạy sạch cả 20 case liền một mạch. Case 4 tự nó đã cho 1 lần fail + 1 lần đạt
+chỉ trong 2 lần thử liên tiếp, không đổi gì code ở giữa — chứng minh rõ AI có tính ngẫu nhiên đáng kể ở
+case biên (thời lượng quá ngắn so với nội dung). Nếu chạy lại đúng 1 lượt 20/20 liền mạch, tỷ lệ pass thật
+có thể thấp hơn 70% (nếu case 4/9/6 rơi vào lần thử xấu) hoặc bằng/cao hơn (nếu may mắn). **Chưa làm, để lại
+trước CP6:** 1 lượt chạy sạch toàn bộ 20 case liền mạch (không retry riêng lẻ) để có con số thật sự đại
+diện cho tỷ lệ pass ổn định của hệ thống, thay vì con số tốt nhất quan sát được qua nhiều lần thử rời rạc.

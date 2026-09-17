@@ -74,9 +74,10 @@ KHÔNG bịa số liệu/ví dụ không có trong 2 khối TEXT ở trên — m
 
 ĐẦY ĐỦ Ý — nếu một trang/nguồn liệt kê NHIỀU mục riêng biệt cùng loại (nhiều mốc thời gian, nhiều khái
 niệm trong 1 quan hệ lồng nhau/phân cấp, nhiều bước trong 1 quy trình...), phải trích ĐỦ TỪNG mục thành 1
-"thongTin" riêng và đưa đủ vào kịch bản — không được gộp chung/lược bớt/chỉ chọn vài mục rồi bỏ qua các mục
-còn lại, kể cả khi kịch bản ngắn. Ưu tiên: nêu đủ mục (kể cả ngắn gọn) hơn là bỏ sót mục vì muốn câu văn
-mượt hơn.
+"thongTin" riêng — không được gộp chung/lược bớt khi TRÍCH nguồn.
+NHƯNG khi VIẾT kịch bản, nếu thời lượng quá ngắn so với số mục đã trích (vd 1 phút cho 8 mục), PHẢI CHỌN
+một vài mục quan trọng nhất để giải thích cho rõ ràng, KHÔNG được nhồi nhét toàn bộ mục vào 1-2 câu dày đặc
+khó hiểu chỉ để "đủ ý" — thà kịch bản chỉ nói kỹ 2-3 mục còn hơn liệt kê hời hợt cả 8 mục trong 1 câu.
 
 BẮT BUỘC — đối chiếu chéo (đây là chỗ khó nhất của đề, đừng bỏ qua): với mỗi "thongTin", CHỦ ĐỘNG kiểm tra
 theo đúng thứ tự sau, đừng dừng lại ở nguồn đầu tiên gặp:
