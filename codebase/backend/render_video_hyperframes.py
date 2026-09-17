@@ -19,9 +19,11 @@ Dùng: python3 render_video_hyperframes.py <đường_dẫn_kịch_bản.json> <
 import html
 import json
 import os
+import queue
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from render_video import audio_duration_sec, make_silence, tts_to_file
 from render_video import client as openai_client
@@ -270,57 +272,88 @@ def init_project(project_dir: str) -> None:
     )
 
 
-def render(kich_ban: dict, out_mp4: str) -> None:
+def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
+    """Xử lý ĐÚNG 1 câu — tách riêng khỏi render() để chạy song song được. Mỗi lời gọi hàm này
+    PHẢI nhận 1 project_dir RIÊNG (không dùng chung giữa các luồng cùng lúc), vì mỗi lần ghi đè
+    index.html của chính project đó rồi mới render — 2 luồng dùng chung 1 project sẽ ghi đè lẫn
+    nhau, ra video sai cảnh."""
+    n = cau.get("n", i)
+    audio_path = os.path.join(tmp, f"a_{i:03d}.mp3")
+    if cau.get("loi"):
+        print(f"[TTS] câu {n}: {cau['loi'][:50]}...")
+        tts_to_file(cau["loi"], audio_path)
+        duration = audio_duration_sec(audio_path)
+    else:
+        duration = float(cau.get("dungGiay", SILENCE_DEFAULT_SEC))
+        make_silence(audio_path, duration)
+
+    # AI có tính ngẫu nhiên — cùng 1 câu có lúc pass có lúc fail check (phát hiện thật khi
+    # test lại nhiều lần). Thử tối đa 3 lần trước khi rớt về bản mẫu an toàn, giống đúng
+    # pattern retry 3 lần đã dùng ở /generate (main.py) thay vì rớt ngay sau 1 lần thử.
+    index_path = os.path.join(project_dir, "index.html")
+    used_ai_scene = False
+    for attempt in range(3):
+        ai_content = generate_ai_scene(cau, duration)
+        if ai_content is None:
+            continue
+        with open(index_path, "w", encoding="utf-8") as f:
+            f.write(build_ai_scene_html(ai_content, duration))
+        if validate_scene(project_dir):
+            used_ai_scene = True
+            break
+        print(f"[HyperFrames] Cảnh {n}: AI-designed layout lần {attempt + 1} không qua check, thử lại...")
+    if not used_ai_scene:
+        print(f"[HyperFrames] Cảnh {n}: hết 3 lần thử, dùng bản mẫu an toàn.")
+        with open(index_path, "w", encoding="utf-8") as f:
+            f.write(render_scene_html(cau, duration))
+
+    visual_path = os.path.join(tmp, f"v_{i:03d}.mp4")
+    kind = "AI tự thiết kế" if used_ai_scene else "bản mẫu cố định"
+    print(f"[HyperFrames] render cảnh {n} ({duration:.1f}s, {kind})...")
+    render_scene_video(project_dir, visual_path)
+
+    segment_path = os.path.join(tmp, f"s_{i:03d}.mp4")
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", visual_path, "-i", audio_path,
+         "-c:v", "libx264", "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p",
+         "-shortest", segment_path],
+        check=True, capture_output=True,
+    )
+    return segment_path
+
+
+def render(kich_ban: dict, out_mp4: str, max_workers: int = 4) -> None:
+    """Chạy SONG SONG nhiều câu cùng lúc (mặc định 4 luồng) thay vì tuần tự từng câu — mỗi câu
+    độc lập hoàn toàn (TTS + AI thiết kế + render riêng), chỉ cần ghép nối đúng THỨ TỰ ở bước
+    cuối. Tốc độ tổng thể tăng gần đúng theo số luồng (máy 12 core, mỗi luồng ăn ~300-400MB cho
+    1 Chrome headless riêng — 4 luồng vẫn thoải mái với máy 15GB RAM). Tăng max_workers nếu máy
+    khoẻ hơn, giảm nếu thấy hết RAM/CPU quá tải."""
     cau_list = kich_ban.get("cau", [])
+    n_workers = min(max_workers, len(cau_list)) or 1
     with tempfile.TemporaryDirectory() as tmp:
-        project_dir = os.path.join(tmp, "hf-project")
-        init_project(project_dir)
+        # Tạo trước n_workers project riêng biệt, đưa vào hàng đợi — mỗi luồng mượn 1 project,
+        # xong câu thì trả lại hàng đợi cho luồng khác dùng tiếp (tránh ghi đè lẫn nhau).
+        dir_pool: "queue.Queue[str]" = queue.Queue()
+        for w in range(n_workers):
+            project_dir = os.path.join(tmp, f"hf-project-{w}")
+            init_project(project_dir)
+            dir_pool.put(project_dir)
 
-        segment_paths = []
-        for i, cau in enumerate(cau_list):
-            n = cau.get("n", i)
-            audio_path = os.path.join(tmp, f"a_{i:03d}.mp3")
-            if cau.get("loi"):
-                print(f"[TTS] câu {n}: {cau['loi'][:50]}...")
-                tts_to_file(cau["loi"], audio_path)
-                duration = audio_duration_sec(audio_path)
-            else:
-                duration = float(cau.get("dungGiay", SILENCE_DEFAULT_SEC))
-                make_silence(audio_path, duration)
+        def _worker(i: int, cau: dict) -> tuple[int, str]:
+            project_dir = dir_pool.get()
+            try:
+                return i, _process_one_scene(i, cau, tmp, project_dir)
+            finally:
+                dir_pool.put(project_dir)
 
-            # AI có tính ngẫu nhiên — cùng 1 câu có lúc pass có lúc fail check (phát hiện thật khi
-            # test lại nhiều lần). Thử tối đa 3 lần trước khi rớt về bản mẫu an toàn, giống đúng
-            # pattern retry 3 lần đã dùng ở /generate (main.py) thay vì rớt ngay sau 1 lần thử.
-            index_path = os.path.join(project_dir, "index.html")
-            used_ai_scene = False
-            for attempt in range(3):
-                ai_content = generate_ai_scene(cau, duration)
-                if ai_content is None:
-                    continue
-                with open(index_path, "w", encoding="utf-8") as f:
-                    f.write(build_ai_scene_html(ai_content, duration))
-                if validate_scene(project_dir):
-                    used_ai_scene = True
-                    break
-                print(f"[HyperFrames] Cảnh {n}: AI-designed layout lần {attempt + 1} không qua check, thử lại...")
-            if not used_ai_scene:
-                print(f"[HyperFrames] Cảnh {n}: hết 3 lần thử, dùng bản mẫu an toàn.")
-                with open(index_path, "w", encoding="utf-8") as f:
-                    f.write(render_scene_html(cau, duration))
+        results: dict[int, str] = {}
+        with ThreadPoolExecutor(max_workers=n_workers) as pool:
+            futures = [pool.submit(_worker, i, cau) for i, cau in enumerate(cau_list)]
+            for fut in as_completed(futures):
+                i, segment_path = fut.result()
+                results[i] = segment_path
 
-            visual_path = os.path.join(tmp, f"v_{i:03d}.mp4")
-            kind = "AI tự thiết kế" if used_ai_scene else "bản mẫu cố định"
-            print(f"[HyperFrames] render cảnh {n} ({duration:.1f}s, {kind})...")
-            render_scene_video(project_dir, visual_path)
-
-            segment_path = os.path.join(tmp, f"s_{i:03d}.mp4")
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", visual_path, "-i", audio_path,
-                 "-c:v", "libx264", "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p",
-                 "-shortest", segment_path],
-                check=True, capture_output=True,
-            )
-            segment_paths.append(segment_path)
+        segment_paths = [results[i] for i in range(len(cau_list))]
 
         concat_list_path = os.path.join(tmp, "concat.txt")
         with open(concat_list_path, "w") as f:

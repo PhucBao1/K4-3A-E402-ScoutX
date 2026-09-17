@@ -66,6 +66,20 @@
   }
   .row { display: flex; gap: 12px; }
   .row > div { flex: 1; }
+  @media (max-width: 560px) {
+    .row { flex-direction: column; gap: 0; }
+    main { padding: 14px; }
+    .card { padding: 14px; }
+  }
+  .elapsed { opacity: .75; font-variant-numeric: tabular-nums; }
+  .steps { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; font-size: 12.5px; color: var(--muted); }
+  .steps span { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
+  .steps span.active { border-color: var(--accent); color: var(--accent); font-weight: 700; background: var(--accent-soft); }
+  details.info-toggle { margin-top: 6px; }
+  details.info-toggle summary { cursor: pointer; font-size: 12.5px; color: var(--muted); list-style: none; }
+  details.info-toggle summary::-webkit-details-marker { display: none; }
+  details.info-toggle summary::before { content: "ℹ️ "; }
+  details.info-toggle[open] summary::before { content: "▾ "; }
   .actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
   button.primary {
     background: var(--accent);
@@ -190,13 +204,19 @@
   <p>Nhập chủ đề (slide là tuỳ chọn) → AI tự tìm nguồn, viết kịch bản video, mỗi câu gắn đúng nguồn — bấm vào câu hoặc nguồn để xem chứng minh.</p>
 </header>
 <div class="banner warn">
-  ℹ️ AI tự tìm 2-3 nguồn trên mạng theo chủ đề và chấm độ tin cậy từng nguồn; nếu có upload slide, AI đọc thêm slide làm nguồn bổ sung. Bấm "Loại nguồn này" trên 1 nguồn để yêu cầu AI viết lại đúng những câu phụ thuộc vào nguồn đó — các câu khác giữ nguyên.
-</div>
-<div class="banner warn">
-  ⚠️ Kịch bản do AI viết ra ĐÂY LÀ BẢN NHÁP — giảng viên/người duyệt phải xem lại và duyệt nội dung trước khi dùng để dựng thành video thật.
+  ⚠️ Kịch bản AI viết ra là <b>bản nháp</b> — người duyệt cần xem lại trước khi dùng thật.
+  <details class="info-toggle">
+    <summary>Cách hoạt động / cách sửa nguồn sai</summary>
+    AI tự tìm 2-3 nguồn trên mạng theo chủ đề và chấm độ tin cậy từng nguồn; nếu có upload slide, AI đọc thêm slide làm nguồn bổ sung. Thấy nguồn nào không đáng tin? Bấm "Loại nguồn này" — AI sẽ chỉ viết lại đúng những câu phụ thuộc vào nguồn đó, các câu khác giữ nguyên.
+  </details>
 </div>
 
 <main>
+  <div class="steps">
+    <span class="active">① Nhập chủ đề</span>
+    <span>② Xem kịch bản &amp; nguồn</span>
+    <span>③ (Tuỳ chọn) Dựng video</span>
+  </div>
   <div class="card">
     <label for="topic">Chủ đề</label>
     <input id="topic" placeholder="VD: Phân biệt AI, Machine Learning, Deep Learning, GenAI, LLM">
@@ -388,6 +408,34 @@ function mapOfficialToInternal(hoSo, kichBan) {
   });
 
   return { sources, sentences };
+}
+
+// ---- Đồng hồ đếm giây khi chờ — tránh cảm giác "bị treo" ở các thao tác lâu (30s-vài phút),
+// đúng vấn đề thật gặp phải khi test render video/mở rộng kịch bản nhiều câu. ----
+function startElapsedTimer(el, baseText) {
+  const start = Date.now();
+  const tick = () => {
+    const sec = Math.floor((Date.now() - start) / 1000);
+    el.innerHTML = `<span class="spinner"></span>${baseText} <span class="elapsed">(${sec}s)</span>`;
+  };
+  tick();
+  const id = setInterval(tick, 1000);
+  return () => clearInterval(id);
+}
+// Biến thể cho nút (chỉ có textContent, không chèn được <span>) — dùng ký tự đếm giây trong text.
+function startElapsedButtonTimer(btn, baseText) {
+  const start = Date.now();
+  const tick = () => {
+    const sec = Math.floor((Date.now() - start) / 1000);
+    btn.textContent = `${baseText} (${sec}s)`;
+  };
+  tick();
+  const id = setInterval(tick, 1000);
+  return () => clearInterval(id);
+}
+
+function setStep(n) {
+  document.querySelectorAll('.steps span').forEach((el, i) => el.classList.toggle('active', i === n - 1));
 }
 
 function downloadJSON(obj, filename) {
@@ -632,6 +680,7 @@ runBtn.addEventListener('click', async () => {
   renderVideoBtn.disabled = true;
   expandScriptBtn.disabled = true;
   videoArea.style.display = 'none';
+  let stopTimer = startElapsedTimer(loading, 'Đang tìm nguồn và viết kịch bản (thường 20-60 giây)…');
 
   const formData = new FormData();
   if (fileInput.files.length) formData.append('file', fileInput.files[0]);
@@ -657,6 +706,7 @@ runBtn.addEventListener('click', async () => {
     renderSentences();
     renderQaContentRows();
     results.classList.add('show');
+    setStep(2);
     exportScriptBtn.disabled = false;
     exportSourcesBtn.disabled = false;
     renderVideoBtn.disabled = false;
@@ -666,12 +716,16 @@ runBtn.addEventListener('click', async () => {
     // nút "Làm phong phú kịch bản", nhiều người không biết nút này ở đâu nên tưởng hệ thống
     // luôn trả kịch bản ngắn. Vẫn giữ nguyên guard an toàn của /expand-script (tự rớt về bản
     // gốc nếu AI vi phạm luật) — chỉ đổi chỗ gọi từ "bấm tay" sang "tự động gọi 1 lần".
-    loading.innerHTML = '<span class="spinner"></span>Đang làm phong phú kịch bản…';
+    // Bước này gọi AI LẶP NHIỀU VÒNG nên có thể mất vài phút (không phải bị treo) — ghi rõ kỳ
+    // vọng thời gian để tránh hiểu lầm "sao lâu vậy" (vấn đề thật gặp phải khi test).
+    stopTimer();
+    stopTimer = startElapsedTimer(loading, 'Đang làm phong phú kịch bản (có thể mất 1-5 phút, AI viết nhiều vòng)…');
     await expandScript({ silent: true });
   } catch (err) {
     // KHÔNG tự động render dữ liệu mẫu khi lỗi — chỉ hiện error state (xem PLAN.md mục 6)
     showError(err.message || 'Không gọi được hệ thống, vui lòng thử lại.');
   } finally {
+    stopTimer();
     loading.classList.remove('show');
     loading.innerHTML = '<span class="spinner"></span>Đang tìm nguồn và viết kịch bản…';
     runBtn.disabled = false;
@@ -694,7 +748,7 @@ async function expandScript({ silent = false } = {}) {
   if (!silent) errorBox.style.display = 'none';
   expandScriptBtn.disabled = true;
   const originalExpandText = expandScriptBtn.textContent;
-  expandScriptBtn.textContent = '✨ Đang làm phong phú…';
+  const stopBtnTimer = startElapsedButtonTimer(expandScriptBtn, '✨ Đang làm phong phú (có thể vài phút)…');
 
   // Dùng /expand-script-full — gọi LẶP nhiều vòng expand_script_with_analogy() ở backend (xem
   // main.py: expand_script_to_target()) để cố đạt gần số câu mục tiêu theo thời lượng mong muốn,
@@ -731,6 +785,7 @@ async function expandScript({ silent = false } = {}) {
   } catch (err) {
     if (!silent) showError(err.message || 'Không mở rộng được, vui lòng thử lại.');
   } finally {
+    stopBtnTimer();
     expandScriptBtn.disabled = false;
     expandScriptBtn.textContent = originalExpandText;
   }
@@ -745,7 +800,7 @@ renderVideoBtn.addEventListener('click', async () => {
   renderVideoBtn.disabled = true;
   expandScriptBtn.disabled = true;
   const originalText = renderVideoBtn.textContent;
-  renderVideoBtn.textContent = '🎬 Đang dựng video (TTS thật, ~30-60 giây)…';
+  const stopBtnTimer = startElapsedButtonTimer(renderVideoBtn, '🎬 Đang dựng video (TTS thật, thường 30-60 giây)…');
 
   const formData = new FormData();
   formData.append('kich_ban_json', JSON.stringify(AppState.kichBanJson));
@@ -759,9 +814,11 @@ renderVideoBtn.addEventListener('click', async () => {
     const blob = await res.blob();
     videoPlayer.src = URL.createObjectURL(blob);
     videoArea.style.display = 'block';
+    setStep(3);
   } catch (err) {
     showError(err.message || 'Không dựng được video, vui lòng thử lại.');
   } finally {
+    stopBtnTimer();
     renderVideoBtn.disabled = false;
   expandScriptBtn.disabled = false;
     renderVideoBtn.textContent = originalText;
@@ -881,6 +938,7 @@ demoBtn.addEventListener('click', () => {
   renderSentences();
   renderQaContentRows();
   results.classList.add('show');
+  setStep(2);
   demoBanner.style.display = 'block';
   exportScriptBtn.disabled = false;
   exportSourcesBtn.disabled = false;
