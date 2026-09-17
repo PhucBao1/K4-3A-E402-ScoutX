@@ -275,11 +275,23 @@
     </div>
 
     <div id="qaContentSection" style="display:none; margin-top:16px; border-top:1px solid #ddd; padding-top:12px;">
-      <h3 style="margin-top:0;">🔍 QA nội dung: kiểm tra AI có phát hiện được lệch không? (Feature B — thử nghiệm, xem BA.md)</h3>
-      <p style="font-size:0.9em;color:#666;">⚠️ Đây là bài test giả lập, KHÔNG phải đối chiếu với video thật vừa dựng — video TTS ở trên đọc đúng y hệt kịch bản nên không có gì để so. Mục đích: giả sử sau này có người đọc thật (hoặc TTS khác) lỡ đọc SAI đi so với bản đã duyệt, AI có bắt được không? Hãy tự sửa cột "Lời trong video" bên dưới thành một câu SAI LỆCH (đổi số liệu, đổi ý...) rồi bấm kiểm tra để xem AI phát hiện đúng không.</p>
-      <div id="qaContentRows"></div>
-      <button class="primary" id="qaContentCheckBtn" style="margin-top:8px;">Kiểm tra đối chiếu</button>
-      <div id="qaContentResults" style="margin-top:10px;"></div>
+      <h3 style="margin-top:0;">🔍 QA nội dung: video có đọc lệch kịch bản không? (Feature B — thử nghiệm, xem BA.md)</h3>
+      <p style="font-size:0.9em;color:#666;">Đúng quy trình lab coach mô tả: nghe video → chuyển thành văn bản → đối chiếu với kịch bản. AI làm cả 3 bước.</p>
+
+      <div style="background:#f5f5f5;padding:10px;border-radius:6px;margin-bottom:12px;">
+        <label for="qaAudioFile">Cách 1 — Upload file audio/video thật (khuyên dùng)</label>
+        <input id="qaAudioFile" type="file" accept="audio/*,video/*">
+        <button class="primary" id="qaFromAudioBtn" style="margin-top:8px;">🎧 Nghe & đối chiếu (Whisper)</button>
+        <div id="qaAudioResults" style="margin-top:10px;"></div>
+      </div>
+
+      <details>
+        <summary style="cursor:pointer;font-size:0.9em;color:#666;">Cách 2 — Chưa có file audio? Tự gõ giả lập câu lệch để test nhanh</summary>
+        <p style="font-size:0.85em;color:#666;">Sửa cột "Lời trong video" thành câu SAI (đổi số liệu, đổi ý...) rồi bấm kiểm tra, để xem AI có phát hiện được không — không cần file thật.</p>
+        <div id="qaContentRows"></div>
+        <button class="secondary" id="qaContentCheckBtn" style="margin-top:8px;">Kiểm tra đối chiếu (giả lập)</button>
+        <div id="qaContentResults" style="margin-top:10px;"></div>
+      </details>
     </div>
 
     <div id="proof">
@@ -704,7 +716,45 @@ function renderQaContentRows() {
     </div>`).join('');
 }
 
-const NHAN_LABEL = { "khop": "✅ Khớp", "lech-nhe": "⚠️ Lệch nhẹ", "lech-noi-dung": "❌ LỆCH NỘI DUNG" };
+const NHAN_LABEL = { "khop": "✅ Khớp", "lech-nhe": "⚠️ Lệch nhẹ", "lech-noi-dung": "❌ LỆCH NỘI DUNG", "thieu": "❌ THIẾU (không thấy trong video)" };
+
+function renderQaResultTable(container, ketQua) {
+  container.innerHTML = '<table style="width:100%;border-collapse:collapse;">' +
+    '<tr style="text-align:left;border-bottom:1px solid #ddd;"><th>Câu</th><th>Nhãn</th><th>Mức</th><th>Giải thích</th><th>Duyệt</th></tr>' +
+    ketQua.map(r => `<tr style="border-bottom:1px solid #eee;">
+      <td>${r.n}</td><td>${NHAN_LABEL[r.nhan] || r.nhan}</td><td>${escapeHtml(r.mucNghiemTrong)}</td>
+      <td>${escapeHtml(r.giaiThich)}</td>
+      <td>${r.nhan === 'khop' ? '' : '<label><input type="checkbox"> Accept</label> <label><input type="checkbox"> Reject</label>'}</td>
+    </tr>`).join('') + '</table>';
+}
+
+const qaAudioFile = document.getElementById('qaAudioFile');
+const qaAudioResults = document.getElementById('qaAudioResults');
+const qaFromAudioBtn = document.getElementById('qaFromAudioBtn');
+
+qaFromAudioBtn.addEventListener('click', async () => {
+  if (!qaAudioFile.files.length) { showError('Chọn file audio/video trước.'); return; }
+  qaAudioResults.innerHTML = '<span class="spinner"></span> Đang nghe và đối chiếu (Whisper + AI, có thể mất 10-30 giây)…';
+  qaFromAudioBtn.disabled = true;
+  try {
+    const formData = new FormData();
+    formData.append('kich_ban_json', JSON.stringify(AppState.kichBanJson));
+    formData.append('file', qaAudioFile.files[0]);
+    const res = await fetch('/qa-content-from-audio', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    renderQaResultTable(qaAudioResults, data.ketQua);
+    qaAudioResults.innerHTML += `<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:0.85em;color:#666;">Xem bản chép lời Whisper</summary><p style="font-size:0.85em;">${escapeHtml(data.transcript)}</p></details>`;
+  } catch (err) {
+    qaAudioResults.innerHTML = '';
+    showError(err.message || 'Không đối chiếu được, vui lòng thử lại.');
+  } finally {
+    qaFromAudioBtn.disabled = false;
+  }
+});
 
 qaContentCheckBtn.addEventListener('click', async () => {
   const pairs = Array.from(document.querySelectorAll('.qa-video-line')).map(input => {
@@ -722,13 +772,7 @@ qaContentCheckBtn.addEventListener('click', async () => {
       throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
     }
     const data = await res.json();
-    qaContentResults.innerHTML = '<table style="width:100%;border-collapse:collapse;">' +
-      '<tr style="text-align:left;border-bottom:1px solid #ddd;"><th>Câu</th><th>Nhãn</th><th>Mức</th><th>Giải thích</th><th>Duyệt</th></tr>' +
-      data.ketQua.map(r => `<tr style="border-bottom:1px solid #eee;">
-        <td>${r.n}</td><td>${NHAN_LABEL[r.nhan] || r.nhan}</td><td>${escapeHtml(r.mucNghiemTrong)}</td>
-        <td>${escapeHtml(r.giaiThich)}</td>
-        <td>${r.nhan === 'khop' ? '' : '<label><input type="checkbox"> Accept</label> <label><input type="checkbox"> Reject</label>'}</td>
-      </tr>`).join('') + '</table>';
+    renderQaResultTable(qaContentResults, data.ketQua);
   } catch (err) {
     qaContentResults.innerHTML = '';
     showError(err.message || 'Không kiểm tra được, vui lòng thử lại.');
