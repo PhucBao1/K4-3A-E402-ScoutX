@@ -274,6 +274,14 @@
       <p style="font-size:0.85em;color:#666;">Video dựng từ TTS thật, khung hình tĩnh — không phải animation. Xem <code>codebase/backend/README.md</code> để biết giới hạn.</p>
     </div>
 
+    <div id="qaContentSection" style="display:none; margin-top:16px; border-top:1px solid #ddd; padding-top:12px;">
+      <h3 style="margin-top:0;">🔍 QA nội dung video (Feature B — thử nghiệm, xem BA.md)</h3>
+      <p style="font-size:0.9em;color:#666;">Sửa cột "Lời trong video" để giả lập video thật đã dựng khác kịch bản (đọc nhầm, đổi số liệu...), rồi bấm kiểm tra. AI sẽ so ngữ nghĩa từng câu, gắn nhãn khớp/lệch nhẹ/lệch nội dung.</p>
+      <div id="qaContentRows"></div>
+      <button class="primary" id="qaContentCheckBtn" style="margin-top:8px;">Kiểm tra đối chiếu</button>
+      <div id="qaContentResults" style="margin-top:10px;"></div>
+    </div>
+
     <div id="proof">
       <div class="proof-head">Đoạn chứng minh — <span id="proofSourceName"></span></div>
       <dl class="proof-meta" id="proofMeta"></dl>
@@ -514,6 +522,7 @@ async function removeSourceAndRewrite(sourceId) {
 
     renderSources();
     renderSentences();
+    renderQaContentRows();
     proof.classList.remove('show');
     clickHint.style.display = 'block';
   } catch (err) {
@@ -564,6 +573,7 @@ async function addSourceAndRegenerate() {
 
     renderSources();
     renderSentences();
+    renderQaContentRows();
     document.getElementById('addSourceForm').style.display = 'none';
     ['addSourceUrl', 'addSourceTitle', 'addSourceOrg', 'addSourceDate', 'addSourceExcerpt']
       .forEach(id => { document.getElementById(id).value = ''; });
@@ -620,6 +630,7 @@ runBtn.addEventListener('click', async () => {
 
     renderSources();
     renderSentences();
+    renderQaContentRows();
     results.classList.add('show');
     exportScriptBtn.disabled = false;
     exportSourcesBtn.disabled = false;
@@ -672,6 +683,58 @@ renderVideoBtn.addEventListener('click', async () => {
   }
 });
 
+// ---- Feature B: QA nội dung video so với kịch bản đã duyệt ----
+const qaContentSection = document.getElementById('qaContentSection');
+const qaContentRows = document.getElementById('qaContentRows');
+const qaContentResults = document.getElementById('qaContentResults');
+const qaContentCheckBtn = document.getElementById('qaContentCheckBtn');
+
+function renderQaContentRows() {
+  const cau = (AppState.kichBanJson && AppState.kichBanJson.cau) || [];
+  const withLoi = cau.filter(c => c.loi);
+  if (!withLoi.length) { qaContentSection.style.display = 'none'; return; }
+  qaContentSection.style.display = 'block';
+  qaContentResults.innerHTML = '';
+  qaContentRows.innerHTML = withLoi.map(c => `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; align-items:start;">
+      <div><label style="font-size:0.8em;color:#666;">Câu ${c.n} — đã duyệt</label>
+        <div style="padding:6px;background:#f5f5f5;border-radius:4px;">${escapeHtml(c.loi)}</div></div>
+      <div><label style="font-size:0.8em;color:#666;">Lời trong video (sửa để giả lập lệch)</label>
+        <input type="text" class="qa-video-line" data-n="${c.n}" value="${escapeHtml(c.loi)}" style="width:100%;"></div>
+    </div>`).join('');
+}
+
+const NHAN_LABEL = { "khop": "✅ Khớp", "lech-nhe": "⚠️ Lệch nhẹ", "lech-noi-dung": "❌ LỆCH NỘI DUNG" };
+
+qaContentCheckBtn.addEventListener('click', async () => {
+  const pairs = Array.from(document.querySelectorAll('.qa-video-line')).map(input => {
+    const n = parseInt(input.dataset.n);
+    const cau = AppState.kichBanJson.cau.find(c => c.n === n);
+    return { n, loiGoc: cau.loi, loiTrongVideo: input.value };
+  });
+  qaContentResults.innerHTML = '<span class="spinner"></span> Đang so sánh…';
+  try {
+    const formData = new FormData();
+    formData.append('pairs_json', JSON.stringify(pairs));
+    const res = await fetch('/qa-content', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    qaContentResults.innerHTML = '<table style="width:100%;border-collapse:collapse;">' +
+      '<tr style="text-align:left;border-bottom:1px solid #ddd;"><th>Câu</th><th>Nhãn</th><th>Mức</th><th>Giải thích</th><th>Duyệt</th></tr>' +
+      data.ketQua.map(r => `<tr style="border-bottom:1px solid #eee;">
+        <td>${r.n}</td><td>${NHAN_LABEL[r.nhan] || r.nhan}</td><td>${escapeHtml(r.mucNghiemTrong)}</td>
+        <td>${escapeHtml(r.giaiThich)}</td>
+        <td>${r.nhan === 'khop' ? '' : '<label><input type="checkbox"> Accept</label> <label><input type="checkbox"> Reject</label>'}</td>
+      </tr>`).join('') + '</table>';
+  } catch (err) {
+    qaContentResults.innerHTML = '';
+    showError(err.message || 'Không kiểm tra được, vui lòng thử lại.');
+  }
+});
+
 // ---- Demo offline: bấm CHỦ ĐỘNG mới xem, không bao giờ tự động bật khi /generate lỗi ----
 const DEMO_FALLBACK = {
   hoSo: {
@@ -699,6 +762,7 @@ demoBtn.addEventListener('click', () => {
 
   renderSources();
   renderSentences();
+  renderQaContentRows();
   results.classList.add('show');
   demoBanner.style.display = 'block';
   exportScriptBtn.disabled = false;
