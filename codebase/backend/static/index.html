@@ -267,6 +267,7 @@
     <div class="export-row">
       <button class="secondary" id="exportScriptBtn" disabled>⬇️ Xuất kịch bản (.json)</button>
       <button class="secondary" id="exportSourcesBtn" disabled>⬇️ Xuất hồ sơ tài liệu (.json)</button>
+      <button class="secondary" id="expandScriptBtn" disabled>✨ Làm phong phú kịch bản</button>
       <button class="primary" id="renderVideoBtn" disabled>🎬 Dựng video (bonus, tốn ~30-60 giây)</button>
     </div>
     <div id="videoArea" style="display:none; margin-top:10px;">
@@ -427,6 +428,7 @@ const clickHint = document.getElementById('clickHint');
 const exportScriptBtn = document.getElementById('exportScriptBtn');
 const exportSourcesBtn = document.getElementById('exportSourcesBtn');
 const renderVideoBtn = document.getElementById('renderVideoBtn');
+const expandScriptBtn = document.getElementById('expandScriptBtn');
 const videoArea = document.getElementById('videoArea');
 const videoPlayer = document.getElementById('videoPlayer');
 
@@ -628,6 +630,7 @@ runBtn.addEventListener('click', async () => {
   exportScriptBtn.disabled = true;
   exportSourcesBtn.disabled = true;
   renderVideoBtn.disabled = true;
+  expandScriptBtn.disabled = true;
   videoArea.style.display = 'none';
 
   const formData = new FormData();
@@ -657,6 +660,7 @@ runBtn.addEventListener('click', async () => {
     exportScriptBtn.disabled = false;
     exportSourcesBtn.disabled = false;
     renderVideoBtn.disabled = false;
+  expandScriptBtn.disabled = false;
   } catch (err) {
     // KHÔNG tự động render dữ liệu mẫu khi lỗi — chỉ hiện error state (xem PLAN.md mục 6)
     showError(err.message || 'Không gọi được hệ thống, vui lòng thử lại.');
@@ -677,11 +681,46 @@ exportSourcesBtn.addEventListener('click', () => {
   downloadJSON(out, 'scriptscout-ho-so-nguon.json');
 });
 
+expandScriptBtn.addEventListener('click', async () => {
+  if (!AppState.kichBanJson) return;
+  errorBox.style.display = 'none';
+  expandScriptBtn.disabled = true;
+  const originalExpandText = expandScriptBtn.textContent;
+  expandScriptBtn.textContent = '✨ Đang làm phong phú…';
+
+  const formData = new FormData();
+  formData.append('kich_ban_json', JSON.stringify(AppState.kichBanJson));
+
+  try {
+    const res = await fetch('/expand-script', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (!data.daMoRong) {
+      showError('Không mở rộng được lần này (AI vi phạm luật hoặc lỗi) — giữ nguyên kịch bản gốc, thử lại sau.');
+    } else {
+      AppState.kichBanJson = data.kichBan;
+      const mapped = mapOfficialToInternal(AppState.hoSoJson, data.kichBan);
+      AppState.sentences = mapped.sentences;
+      renderSentences();
+      renderQaContentRows();
+    }
+  } catch (err) {
+    showError(err.message || 'Không mở rộng được, vui lòng thử lại.');
+  } finally {
+    expandScriptBtn.disabled = false;
+    expandScriptBtn.textContent = originalExpandText;
+  }
+});
+
 renderVideoBtn.addEventListener('click', async () => {
   if (!AppState.kichBanJson) return;
   errorBox.style.display = 'none';
   videoArea.style.display = 'none';
   renderVideoBtn.disabled = true;
+  expandScriptBtn.disabled = true;
   const originalText = renderVideoBtn.textContent;
   renderVideoBtn.textContent = '🎬 Đang dựng video (TTS thật, ~30-60 giây)…';
 
@@ -701,6 +740,7 @@ renderVideoBtn.addEventListener('click', async () => {
     showError(err.message || 'Không dựng được video, vui lòng thử lại.');
   } finally {
     renderVideoBtn.disabled = false;
+  expandScriptBtn.disabled = false;
     renderVideoBtn.textContent = originalText;
   }
 });
@@ -822,6 +862,7 @@ demoBtn.addEventListener('click', () => {
   exportScriptBtn.disabled = false;
   exportSourcesBtn.disabled = false;
   renderVideoBtn.disabled = false;
+  expandScriptBtn.disabled = false;
 });
 </script>
 
