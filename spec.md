@@ -138,7 +138,8 @@ tường minh, không phải thêm validate số liệu).
   - **Nguyễn Phúc Bảo (2A202602925 - Đội trưởng):** Thiết kế & code backend FastAPI + gpt-4o-mini (`codebase/backend/main.py`), prompt & 7 lớp validate chống bịa số liệu/trích dẫn, xây dựng & chạy bộ golden set 20 case thật (`eval/golden-set.md`), phụ trách demo.
 - Willing users (≥2 tên) + kế hoạch vòng validation *(bonus, nếu làm)*:
   - 1. **Thái Hoàng** (Lab Coach kiêm Studio team) — đã phỏng vấn vòng 1, đồng ý thử nghiệm prototype để đối chiếu thời gian viết kịch bản.
-  - 2. **Lab Coach kiêm Studio Team (Coach phỏng vấn #1)** — đồng ý dùng thử để kiểm chứng tính năng trích dẫn nguồn tự động.
+  - 2. **Khải** (học viên) — đồng ý dùng thử prototype để kiểm tra mức dễ hiểu của kịch bản và khả năng truy ngược từng câu về nguồn.
+  - Kế hoạch CP5: giao mỗi người cùng một chủ đề và thời lượng; ghi thời gian hoàn thành, số câu có nguồn truy được, điểm bị kẹt và quote nguyên văn. Sau đó đối chiếu với quality bar và ghi ít nhất một quyết định thay đổi vào §9 Changelog.
 - Multi-prototype (nếu làm): trục khác biệt của ≥2 phương án + lý do chọn: chưa làm.
 - Kế hoạch Phase 2 (không thuộc lát cắt chính, xem đầy đủ trong `BA.md`):
   1. Feature A — Video Format Compliance Checker (rule-based + OCR, rẻ, build trước).
