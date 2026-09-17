@@ -131,4 +131,57 @@ Bộ 20 case gốc ở trên không phủ hết 5 "chỗ sẽ khó" mà đề C3
 
 **Đã thử sửa và rollback:** thêm hướng dẫn "bắt buộc đủ số câu" vào prompt → **phản tác dụng nghiêm trọng**: AI bắt đầu lặp lại thông tin đã dùng nhưng gắn cho nguồn khác (kể cả nguồn có thật) để đủ số câu — Layer 4a/Layer 7 đúng đắn chặn lại, khiến tỉ lệ fail (502) tăng vọt thay vì có kịch bản dài hơn. Đã rollback về hướng dẫn mềm ("nên đạt khoảng N câu nếu nguồn đủ chất liệu, thà ngắn hơn còn hơn bịa/gắn sai nguồn") — an toàn hơn (không còn tăng fail rate) nhưng độ dài vẫn không đạt.
 
-**Nguyên nhân gốc:** slide mẫu (`d1`/`d2`, 6 trang) chỉ có ~5-7 sự kiện/khái niệm riêng biệt — không đủ chất liệu thật để viết 30+ câu không lặp/không bịa. Đây là giới hạn về **lượng dữ liệu nguồn**, không phải lỗi logic có thể sửa bằng prompt. Hướng giải quyết thật (chưa làm, để lại): cho phép AI viết câu diễn giải/mở rộng ý nghĩa sâu hơn cho mỗi sự kiện đã có (không thêm sự kiện mới) một cách có kiểm soát hơn, hoặc chấp nhận trong tài liệu hướng dẫn rằng thời lượng dài cần slide nguồn phong phú hơn tương ứng.
+**Nguyên nhân gốc:** slide mẫu (`d1`/`d2`, 6 trang) chỉ có ~5-7 sự kiện/khái niệm riêng biệt — không đủ chất liệu thật để viết 30+ câu không lặp/không bịa. Đây là giới hạn về **lượng dữ liệu nguồn**, không phải lỗi logic có thể sửa bằng prompt.
+
+**Lần thử thứ 2 (dựa trên phân tích kịch bản mẫu chính thức của BTC, 40 câu):** đọc kỹ kịch bản mẫu phát
+hiện: BTC đạt 40 câu không phải bằng cách liệt kê nhiều sự kiện có nguồn, mà bằng cách xây **1 ví dụ minh
+hoạ giả định duy nhất** (vd "bộ lọc thư rác") dùng lại xuyên suốt để giải thích từng khái niệm — các câu ví
+dụ minh hoạ không cần trích dẫn vì không phải sự thật cụ thể. Thử đưa chiến lược này vào prompt (chọn 1 ví
+dụ minh hoạ + xen kẽ với câu có trích dẫn thật) → **2/2 lần fail (502)**, tệ hơn cả trước: AI không chỉ lệch
+trích dẫn mà còn có dấu hiệu quay lại viết số bằng CHỮ SỐ thay vì chữ (phá luôn quy tắc Layer 6 đã ổn định).
+Kết luận: prompt đã quá dài/nhiều lớp yêu cầu (chống bịa, chống injection, đối chiếu chéo, không số, ưu
+tiên VN, gợi ý hiện nguồn...) — thêm 1 chiến lược phức tạp nữa làm AI rối, giảm chất lượng tuân thủ các
+quy tắc khác. Đã rollback về bản ổn định trước đó ngay khi phát hiện.
+
+**Quyết định cuối cùng cho CP4:** dừng hẳn việc tinh chỉnh độ dài kịch bản tại đây. Hướng giải quyết đúng
+(để lại cho sau, cần thời gian nhiều hơn): tách thành 2 lượt gọi AI riêng biệt — lượt 1 sinh kịch bản ngắn
+có trích dẫn chắc chắn đúng (như hiện tại), lượt 2 lấy kịch bản đó làm input CỐ ĐỊNH và chỉ thêm câu diễn
+giải/ví dụ minh hoạ xen kẽ (không được sửa câu gốc) — tách trách nhiệm sẽ ổn định hơn nhồi tất cả vào 1
+prompt.
+
+## Case 25 — đối chiếu schema `hoSo` với ví dụ chính thức của BTC, và 1 bug kiến trúc mới phát hiện ở `/rewrite`
+
+Đọc kỹ `data/studio-pack/c3-scriptscout/vi-du/ho-so-nguon-mau.json` (ví dụ chính thức) phát hiện 4 trường
+mình chưa làm đúng/chưa có, đã vá cả 4:
+
+1. **`ngayLayVe`** (thời điểm lấy nguồn) — chưa có → đã thêm, ban đầu AI tự bịa ngày sai (2023), đã sửa
+   bằng cách truyền thẳng giờ hệ thống thật vào prompt thay vì để AI tự đoán.
+2. **`canhBao`** (cảnh báo nguồn cũ/lỗi thời) — chưa có → đã thêm field, nhưng AI áp dụng KHÔNG đều (test
+   với chủ đề "Chi phí mô hình ngôn ngữ" — đúng chủ đề BTC thiết kế để test việc này theo
+   `chu-de-goi-y.md` — vẫn ra `canhBao: []` dù nguồn cũ). Ghi nhận như 1 soft-compliance gap, giống
+   hành vi đối chiếu chéo đa nguồn đã ghi nhận trước đó.
+3. **`loai` chi tiết** (`tai-lieu-chinh-thuc`/`bai-bao-khoa-hoc`/`bao-chi`/`blog-ca-nhan` thay vì chỉ
+   "web") — đã sửa, frontend hoá ra đã sẵn sàng nhận các giá trị này từ trước (không cần sửa UI). Test 2/3
+   lần đúng, 1 lần AI bỏ sót cả `loai` lẫn `trangThai` — cũng ghi nhận soft-compliance.
+4. **`trangThai`/`lyDoLoai` ở cấp NGUỒN** (giữ nguồn bị loại lại trong mảng, đánh dấu "bi-loai" thay vì xoá
+   hẳn) — đã sửa `/rewrite`, xác nhận đúng logic bằng test trực tiếp (không qua AI): nguồn bị loại giữ lại
+   với `trangThai: "bi-loai"` + `lyDoLoai`, các nguồn còn lại là `"dang-dung"`.
+
+**Bug kiến trúc mới phát hiện khi test (4) qua AI thật, chưa sửa:** `/rewrite` gọi lại `search_web_sources()`
+MỖI LẦN gọi — kết quả tìm kiếm không cố định giữa các lần gọi. Khi validate lại TOÀN BỘ hồ sơ đã ghép
+(gồm cả các `thongTin` KHÔNG bị ảnh hưởng bởi nguồn vừa loại, giữ nguyên từ lần sinh trước), các trích dẫn
+đó — vốn đã đúng với web_text CŨ lúc `/generate` — có thể không còn khớp với web_text MỚI vừa tìm lại,
+gây fail giả (không phải AI bịa, mà do so với dữ liệu nền đã đổi). 3/3 lần test `/rewrite` với dữ liệu cụ
+thể đều fail vì lỗi này. Hướng sửa đúng (chưa làm, cần thời gian): chỉ validate phần MỚI (`thongTinMoi`/
+`cauVietLai`) bằng Layer 4a/Layer 7, bỏ qua phần `thongTin` cũ giữ nguyên vì đã qua validate ở lượt sinh
+trước rồi.
+
+## Case 26 — lần thứ 3 làm kịch bản dài hơn: THÀNH CÔNG (tách 2 lượt AI riêng biệt)
+
+Sau 2 lần thất bại (case 24, 25b) vì nhồi chung "kéo dài" và "trích dẫn đúng" vào 1 prompt, tách hẳn thành
+endpoint riêng `/expand-script`: lượt AI thứ 2 CHỈ chèn thêm câu minh hoạ (`nguon: []`, không chữ số,
+không sự kiện mới) xen giữa kịch bản đã validate xong ở lượt 1, có guard tự rớt về bản gốc nếu AI vi phạm.
+
+Test 2/2 lần: 7→12 câu và 7→13 câu, toàn bộ câu mới đúng chuẩn (không trích dẫn, không chữ số), toàn bộ
+câu gốc giữ nguyên. Bài học: tách trách nhiệm ra 2 lượt AI độc lập ổn định hơn nhiều so với dồn hết yêu
+cầu vào 1 prompt dài — đúng như dự đoán ở case 24.
