@@ -34,14 +34,10 @@ rồi gắn nhầm cho nguồn khác để kéo dài. Được phép thêm câu 
 ý nghĩa/liên hệ giữa các ý đã có, miễn KHÔNG nêu số liệu/tên riêng/sự kiện cụ thể mới trong câu đó. Ưu tiên
 tuyệt đối: mọi câu đều có căn cứ đúng nguồn, không bịa thêm hoặc gắn sai nguồn chỉ để đủ số câu.
 
-QUAN TRỌNG — kiểm tra phạm vi trước khi viết: Nếu "Mục tiêu bài học" ở trên KHÔNG liên quan gì tới nội
-dung trong CẢ HAI khối TEXT ở trên (ví dụ: mục tiêu hỏi về nấu ăn, thể thao, hay bất kỳ chủ đề nào không
-xuất hiện trong slide lẫn nguồn mạng), thì TUYỆT ĐỐI KHÔNG tự viết kịch bản theo chủ đề đó. Thay vào đó,
-trả về "kichBan" chỉ có đúng 1 câu (n=1, nguon=[]) với "loi" nói rõ: nội dung yêu cầu không có căn cứ,
-không đủ để viết kịch bản, và gợi ý người dùng đổi chủ đề/mục tiêu cho khớp với nguồn đang có. "hoSo" trong
-trường hợp này để "nguon": [] và "thongTin": [].
+(Chủ đề ngoài phạm vi AI/công nghệ đã bị chặn từ trước khi tới đây — xem `check_topic_in_scope()` trong
+`main.py` — nên phần dưới đây chỉ xử lý chủ đề đã xác nhận thuộc phạm vi.)
 
-Nhiệm vụ (khi mục tiêu có liên quan): trả về ĐÚNG 1 object JSON, không thêm giải thích, không thêm
+Nhiệm vụ: trả về ĐÚNG 1 object JSON, không thêm giải thích, không thêm
 markdown code fence.
 
 Khối "hoSo" — schema "hackathon-ho-so-nguon/1": liệt kê MỌI nguồn đã dùng (cả từ slide lẫn từ mạng) trong
@@ -184,6 +180,18 @@ PHẢI giữ đúng "n" như trong danh sách câu bị ảnh hưởng ở trên
 """
 
 REWRITE_RETRY_SUFFIX = "\n\nCHỈ trả về JSON hợp lệ theo đúng cấu trúc đã mô tả (nguonMoi, thongTinMoi, cauVietLai), không thêm bất kỳ chữ nào khác."
+
+SCOPE_CHECK_PROMPT = """Sản phẩm này CHỈ dùng để tạo video bài giảng cho khoá học về AI/công nghệ/kỹ năng số.
+Chủ đề: "{topic}"
+Mục tiêu bài học: "{goal}"
+
+Chủ đề trên có thuộc lĩnh vực AI/công nghệ/kỹ năng số không? Vẫn tính là THUỘC nếu chỉ liên quan gián tiếp
+(vd: ứng dụng AI trong 1 ngành khác, tác động kinh tế/xã hội của AI, kỹ năng làm việc với AI...). Chỉ tính
+là KHÔNG THUỘC nếu chủ đề rõ ràng thuộc lĩnh vực khác hoàn toàn, không liên quan gì tới AI/công nghệ (vd:
+nấu ăn, thể thao, y tế không liên quan AI, giải trí không liên quan AI...).
+
+Trả về ĐÚNG JSON, không thêm chữ nào khác: {{"thuocPhamVi": true/false, "lyDo": "1 câu ngắn giải thích"}}
+"""
 
 JUDGE_RELEVANCE_PROMPT = """Bạn là người kiểm tra chất lượng trích dẫn, độc lập với AI đã viết kịch bản.
 Với mỗi cặp dưới đây, "doanTrich" được gắn làm bằng chứng cho "noiDung" — nhiệm vụ của bạn là chấm xem

@@ -23,6 +23,7 @@ from prompt import (
     RETRY_SUFFIX,
     REWRITE_PROMPT_TEMPLATE,
     REWRITE_RETRY_SUFFIX,
+    SCOPE_CHECK_PROMPT,
     WEB_SEARCH_PROMPT,
 )
 
@@ -270,6 +271,27 @@ def validate_output(data: dict, source_text: str, user_context_text: str = "") -
             raise ValueError(f"Câu {cau.get('n')} có chữ số trong 'loi' (phải viết bằng chữ): {loi!r}")
 
 
+def check_topic_in_scope(topic: str, goal: str) -> tuple[bool, str]:
+    """Guardrail độc lập, chạy TRƯỚC khi tốn công web-search + gọi AI sinh kịch bản chính — kiểm tra chủ
+    đề có thuộc phạm vi AI/công nghệ không. Phát hiện thật ở golden-set case 5 (chạy lại 17/9 chiều): AI
+    tự tìm được nguồn THẬT về "nấu phở bò" (vì web-search luôn tìm đúng theo topic/goal user gõ) rồi viết
+    hẳn 1 kịch bản nấu ăn hoàn chỉnh, có trích dẫn thật — không lớp validate cũ nào bắt được vì không có gì
+    sai/bịa cả, chỉ là hoàn toàn lạc phạm vi sản phẩm. Hướng dẫn "từ chối nếu ngoài phạm vi" trong prompt
+    chính không đủ vì bị chính web-search (luôn tìm ra thứ "liên quan") vô hiệu hoá điều kiện kích hoạt.
+    Tách thành 1 lượt AI-judge riêng, độc lập — đúng bài học rút ra ở case 24-26 (tách trách nhiệm ổn định
+    hơn nhồi vào 1 prompt), và chặn bằng CODE (HTTPException) thay vì chỉ nhắc AI chính tự giác."""
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": SCOPE_CHECK_PROMPT.format(topic=topic, goal=goal)}],
+            response_format={"type": "json_object"},
+        )
+        result = json.loads(resp.choices[0].message.content)
+        return bool(result.get("thuocPhamVi", True)), result.get("lyDo", "")
+    except Exception:
+        return True, ""  # judge lỗi thì không chặn, ưu tiên không false-positive chặn nhầm luồng chính
+
+
 def check_citation_relevance(data: dict) -> list[str]:
     """Layer 7 — kiểm ngữ nghĩa: "doanTrich" tồn tại thật trong nguồn (Layer 4a) không có nghĩa nó
     THỰC SỰ xác nhận đúng "noiDung" đang gắn vào. Phát hiện thật: khi 2 nguồn nói khác nhau về cùng
@@ -311,7 +333,12 @@ def check_citation_relevance(data: dict) -> list[str]:
         flagged = [i for i in range(len(bc_list)) if (t.get("id"), i) in irrelevant]
         if not flagged:
             continue
-        if declared is not None and declared > len(remaining):
+        # declared >= 2 — Layer 7 chỉ bắt đúng ý đồ gốc (case 22): KHAI KHỐNG số nguồn độc lập xác
+        # nhận (vd nói "da-xac-minh" nhờ 3 nguồn nhưng 1-2 trong đó không thực sự liên quan). Với
+        # soNguonXacNhan=1 (chỉ 1 trích dẫn duy nhất, không có gì để "khai khống thêm"), judge quá
+        # gắt về ngữ nghĩa (paraphrase vs trích nguyên văn) gây fail oan hàng loạt case bình thường —
+        # phát hiện thật khi chạy lại golden-set case 1, 4, 7, 16 đều fail kiểu này dù không hề bịa.
+        if declared is not None and declared >= 2 and declared > len(remaining):
             problems.append(
                 f"thongTin {t.get('id')}: trích dẫn tại index {flagged} bị chấm KHÔNG thực sự liên quan "
                 f"tới nội dung '{t.get('noiDung', '')[:50]}...' nhưng vẫn tính vào soNguonXacNhan={declared}"
@@ -458,6 +485,14 @@ async def generate(
     duration: int = Form(...),
     file: UploadFile | None = File(None),
 ):
+    # Guardrail Layer 8 — chặn SỚM (trước khi đọc PDF/web-search) nếu chủ đề ngoài phạm vi AI/công nghệ.
+    in_scope, ly_do_ngoai_pham_vi = check_topic_in_scope(topic, goal)
+    if not in_scope:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Chủ đề ngoài phạm vi sản phẩm (chỉ làm video bài giảng AI/công nghệ): {ly_do_ngoai_pham_vi}",
+        )
+
     # Đúng bài toán gốc C3: input chỉ cần chủ đề/mục tiêu/đối tượng/thời lượng, KHÔNG bắt buộc đưa
     # sẵn tài liệu — slide là tuỳ chọn để bổ sung, không phải điều kiện bắt buộc để chạy.
     if file is not None:

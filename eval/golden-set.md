@@ -215,7 +215,59 @@ chặn — xác nhận qua case 6 dưới đây.
   Chưa xác định được đây là Layer 7 phát hiện đúng trích dẫn yếu thật, hay đang chấm gắt hơn mức cần thiết
   ở các case này — cần đọc kỹ nội dung từng case để kết luận, **để lại làm tiếp trước CP6**.
 
-**Việc CHƯA làm xong (tự khai trung thực):** 15 case HTTP 200 mới dừng ở "qua được validate tự động", chưa
-đối chiếu nội dung với đúng kỳ vọng từng case (VD case 9 cần đúng mốc lịch sử, case 19 cần đúng độ sâu cho
-giảng viên) như cách chấm ở lượt 1 — cần 1 vòng đọc nội dung thủ công nữa trước khi có thể so % trực tiếp
-với lượt 1.
+**Đã đọc nội dung 15 case pass + đối chiếu kỳ vọng (chiều 17/9, sau khi viết Case 27 ở trên):**
+
+| Case | Kết quả | Ghi chú |
+|---|---|---|
+| 1 | ✅ Đạt | Không bịa %, đúng kỳ vọng |
+| 2 | ⚠️ Một phần | Không bịa nhưng né tránh câu hỏi, chỉ 1 câu quá mỏng |
+| 3 | ✅ Đạt | Chọn góc cụ thể, không lan man |
+| 4 | ❌ Fail (502 lúc đó) | Layer 7 chấm oan — đã sửa, xem case 28 |
+| **5** | **❌ Fail nghiêm trọng** | **AI viết hẳn 5 câu hướng dẫn nấu phở bò đầy đủ, có nguồn thật — hoàn toàn lạc phạm vi sản phẩm. Đã sửa, xem case 28.** |
+| 6 | ❌ Fail (502) | Đúng ý đồ — chặn giá bịa |
+| 7 | ❌ Fail (502 lúc đó) | Layer 7 chấm oan — đã sửa, xem case 28 |
+| 8 | ⚠️ Một phần | Thiếu hẳn "Deep Learning" trong chuỗi liệt kê lồng nhau |
+| 9 | ⚠️ Một phần | An toàn (không bịa) nhưng KHÔNG có bất kỳ mốc lịch sử cụ thể nào (Dartmouth, Transformer 2017, ChatGPT 2022...) |
+| 10 | ✅ Đạt | Đúng nội dung LLM/token |
+| 11 | ✅ Đạt | Phân biệt LLM/Agent ổn |
+| 12 | ⚠️ Một phần | Đúng 3 nhóm nhưng thiếu ví dụ cụ thể |
+| 13 | ⚠️ Một phần | Đúng khái niệm chung, thiếu mô tả cấu trúc "2 hình thoi" |
+| 14 | ✅ Đạt | Đúng tinh thần, không có ví dụ minh hoạ cụ thể |
+| 15 | ✅ Đạt | Đúng HITL (nguồn lấy từ web thay vì slide d2, chấp nhận được) |
+| 16 | ❌ Fail (502 lúc đó) | Layer 7 chấm oan — đã sửa, xem case 28 |
+| 17 | ✅ Đạt | Gọn, không độn — đúng kỳ vọng |
+| 18 | ❌ Fail | Lặp lại đúng lỗi lượt 1: không giải nghĩa tiếng Việt cho "PAIR" ở lần nhắc đầu |
+| 19 | ❌ Fail | Lặp lại đúng lỗi lượt 1: nội dung y hệt mức cơ bản, không đào sâu cho chuyên gia |
+| 20 | ✅ Đạt | Đúng robustness (HTTP 400) |
+
+**Tổng (trước khi sửa case 4/7/16/5 ở case 28): 8/20 đạt đầy đủ (40%) · 5/20 đạt một phần · 7/20 fail** —
+thấp hơn lượt 1 (65%). Case 18/19 là 2 lỗi CŨ từ lượt 1 vẫn chưa sửa (không phải regression mới). Case 8/9
+là dấu hiệu nội dung mỏng đi so với lượt 1 — nghi do prompt độ dài đã đổi mềm hơn (ưu tiên an toàn/ngắn hơn
+dự kiến) sau case 24-26, cần theo dõi thêm, chưa đủ bằng chứng kết luận chắc chắn là regression do prompt
+hay do biến thiên tự nhiên của model.
+
+## Case 28 — vá 2 bug phát hiện từ Case 27 (chiều 17/9, sau CP4)
+
+**Bug 1 — Layer 7 chấm oan case chỉ có 1 trích dẫn (case 1, 4, 7, 16):** `check_citation_relevance()`
+chặn cả khi `soNguonXacNhan=1` (chỉ 1 trích dẫn duy nhất, không hề "khai khống thêm nguồn"), trong khi ý đồ
+gốc của Layer 7 (case 22) là bắt hành vi khai khống SỐ NGUỒN ĐỘC LẬP (declared > thực tế). Với 1 trích dẫn
+duy nhất, judge chấm quá gắt về mức paraphrase khiến fail oan hàng loạt case bình thường không hề bịa. Đã
+sửa: chỉ raise lỗi khi `soNguonXacNhan >= 2` (đúng phạm vi ý đồ ban đầu). Test lại: case 1, 4, 7, 16 đều
+chuyển từ HTTP 502 → HTTP 200; case 6 (đúng phải fail — AI cố đưa giá cụ thể bịa) vẫn fail như cũ, không bị
+nới lỏng nhầm.
+
+**Bug 2 — Case 5 tái hiện, nặng hơn lượt 1 (`prompt.py` dòng 37-42 cũ vô hiệu):** hướng dẫn "từ chối nếu chủ
+đề không liên quan tới CẢ HAI khối slide+web" không bao giờ kích hoạt được, vì hệ thống LUÔN web-search
+đúng theo topic/goal user gõ trước khi gọi AI — nên khối "NGUỒN MẠNG" luôn có nội dung "liên quan" (tự
+nhiên là vậy, vì tìm đúng từ khoá đó). AI tìm được nguồn thật về nấu phở rồi viết hẳn kịch bản nấu ăn, có
+trích dẫn thật 100% — không lớp validate nào bắt được vì không có gì bịa/sai, chỉ là lạc phạm vi sản phẩm.
+
+Sửa bằng **guardrail độc lập kiểu Layer 7** thay vì chỉ sửa prompt chính (đúng góp ý: "sao không dùng
+guardrail"): thêm `check_topic_in_scope()` — 1 lượt AI-judge riêng, chạy TRƯỚC web-search + generate chính,
+chấm chủ đề có thuộc phạm vi AI/công nghệ không, chặn cứng bằng `HTTPException(400)` nếu không. Đồng thời
+bỏ hẳn đoạn hướng dẫn "kiểm tra phạm vi" (đã vô hiệu) ra khỏi `PROMPT_TEMPLATE` chính cho gọn — tránh giữ
+prompt dài mà không còn tác dụng, theo đúng bài học "prompt càng dài càng dễ lỗi" từ case 24-25.
+
+Test lại: case 5 → HTTP 400, chặn đúng và NHANH (dưới 3 giây, vì chặn trước khi tốn công web-search + gọi
+AI chính) thay vì để AI viết xong rồi mới validate fail như trước. Test không phá case đúng phạm vi: case 1
+(AI trong sản xuất) vẫn chạy bình thường.
