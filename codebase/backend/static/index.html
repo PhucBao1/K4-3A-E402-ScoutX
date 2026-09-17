@@ -187,16 +187,23 @@
 
 <header>
   <h1>ScriptScout</h1>
-  <p>Upload slide bài giảng (PDF) → AI đọc slide, viết kịch bản video, mỗi câu gắn đúng nguồn — bấm vào câu hoặc nguồn để xem chứng minh.</p>
+  <p>Nhập chủ đề (slide là tuỳ chọn) → AI tự tìm nguồn, viết kịch bản video, mỗi câu gắn đúng nguồn — bấm vào câu hoặc nguồn để xem chứng minh.</p>
 </header>
 <div class="banner warn">
-  ℹ️ AI đọc slide bạn upload, đồng thời tự tìm thêm 2-3 nguồn trên mạng liên quan tới chủ đề và chấm độ tin cậy từng nguồn. Bấm "Loại nguồn này" trên 1 nguồn để yêu cầu AI viết lại đúng những câu phụ thuộc vào nguồn đó — các câu khác giữ nguyên.
+  ℹ️ AI tự tìm 2-3 nguồn trên mạng theo chủ đề và chấm độ tin cậy từng nguồn; nếu có upload slide, AI đọc thêm slide làm nguồn bổ sung. Bấm "Loại nguồn này" trên 1 nguồn để yêu cầu AI viết lại đúng những câu phụ thuộc vào nguồn đó — các câu khác giữ nguyên.
+</div>
+<div class="banner warn">
+  ⚠️ Kịch bản do AI viết ra ĐÂY LÀ BẢN NHÁP — giảng viên/người duyệt phải xem lại và duyệt nội dung trước khi dùng để dựng thành video thật.
 </div>
 
 <main>
   <div class="card">
-    <label for="slideFile">Slide bài giảng (PDF)</label>
+    <label for="topic">Chủ đề</label>
+    <input id="topic" placeholder="VD: Phân biệt AI, Machine Learning, Deep Learning, GenAI, LLM">
+
+    <label for="slideFile">Slide bài giảng (PDF) — không bắt buộc</label>
     <input id="slideFile" type="file" accept="application/pdf">
+    <p style="font-size:0.85em;color:#666;margin-top:4px;">Không có slide? Bỏ trống — AI sẽ tự tìm nguồn trên mạng theo chủ đề, đúng như một agent nghiên cứu thật sự.</p>
 
     <div class="row">
       <div>
@@ -221,7 +228,7 @@
       <button class="ghost" id="demoBtn">Xem ví dụ demo offline</button>
     </div>
 
-    <div id="loading"><span class="spinner"></span>Đang đọc slide và viết kịch bản…</div>
+    <div id="loading"><span class="spinner"></span>Đang tìm nguồn và viết kịch bản…</div>
     <div id="errorBox"></div>
   </div>
 
@@ -229,13 +236,50 @@
     <h3 style="margin-top:0;">Hồ sơ tài liệu</h3>
     <div id="sourcesArea"></div>
 
+    <button class="ghost" id="showAddSourceBtn" type="button" style="margin-top:8px;">+ Thêm nguồn của bạn</button>
+    <div id="addSourceForm" style="display:none; margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+      <label for="addSourceUrl">URL nguồn</label>
+      <input id="addSourceUrl" placeholder="https://...">
+      <label for="addSourceTitle">Tiêu đề</label>
+      <input id="addSourceTitle" placeholder="Tên bài viết/tài liệu">
+      <div class="row">
+        <div>
+          <label for="addSourceOrg">Tác giả/Tổ chức (nếu biết)</label>
+          <input id="addSourceOrg" placeholder="VD: Bộ Khoa học Công nghệ">
+        </div>
+        <div>
+          <label for="addSourceDate">Ngày đăng (nếu biết)</label>
+          <input id="addSourceDate" placeholder="VD: 2025-03-01">
+        </div>
+      </div>
+      <label for="addSourceExcerpt">Đoạn trích bạn muốn dùng làm bằng chứng</label>
+      <input id="addSourceExcerpt" placeholder="Dán nguyên văn đoạn quan trọng nhất từ trang đó">
+      <div class="actions-row">
+        <button class="primary" id="submitAddSourceBtn" type="button">Thêm và viết lại kịch bản</button>
+        <button class="ghost" id="cancelAddSourceBtn" type="button">Huỷ</button>
+      </div>
+    </div>
+
     <h3>Kịch bản</h3>
     <div id="sentenceList"></div>
     <p class="empty-hint" id="clickHint">👆 Bấm vào một câu hoặc một nguồn bất kỳ để xem đúng chỗ chứng minh cho nó.</p>
 
     <div class="export-row">
-      <button class="secondary" id="exportScriptBtn" disabled>⬇️ Xuất kịch bản (.json) — để dựng video</button>
+      <button class="secondary" id="exportScriptBtn" disabled>⬇️ Xuất kịch bản (.json)</button>
       <button class="secondary" id="exportSourcesBtn" disabled>⬇️ Xuất hồ sơ tài liệu (.json)</button>
+      <button class="primary" id="renderVideoBtn" disabled>🎬 Dựng video (bonus, tốn ~30-60 giây)</button>
+    </div>
+    <div id="videoArea" style="display:none; margin-top:10px;">
+      <video id="videoPlayer" controls style="max-width:100%; border-radius:6px;"></video>
+      <p style="font-size:0.85em;color:#666;">Video dựng từ TTS thật, khung hình tĩnh — không phải animation. Xem <code>codebase/backend/README.md</code> để biết giới hạn.</p>
+    </div>
+
+    <div id="qaContentSection" style="display:none; margin-top:16px; border-top:1px solid #ddd; padding-top:12px;">
+      <h3 style="margin-top:0;">🔍 QA nội dung: kiểm tra AI có phát hiện được lệch không? (Feature B — thử nghiệm, xem BA.md)</h3>
+      <p style="font-size:0.9em;color:#666;">⚠️ Đây là bài test giả lập, KHÔNG phải đối chiếu với video thật vừa dựng — video TTS ở trên đọc đúng y hệt kịch bản nên không có gì để so. Mục đích: giả sử sau này có người đọc thật (hoặc TTS khác) lỡ đọc SAI đi so với bản đã duyệt, AI có bắt được không? Hãy tự sửa cột "Lời trong video" bên dưới thành một câu SAI LỆCH (đổi số liệu, đổi ý...) rồi bấm kiểm tra để xem AI phát hiện đúng không.</p>
+      <div id="qaContentRows"></div>
+      <button class="primary" id="qaContentCheckBtn" style="margin-top:8px;">Kiểm tra đối chiếu</button>
+      <div id="qaContentResults" style="margin-top:10px;"></div>
     </div>
 
     <div id="proof">
@@ -337,6 +381,16 @@ function downloadJSON(obj, filename) {
 
 const runBtn = document.getElementById('runBtn');
 const demoBtn = document.getElementById('demoBtn');
+const showAddSourceBtn = document.getElementById('showAddSourceBtn');
+const cancelAddSourceBtn = document.getElementById('cancelAddSourceBtn');
+const submitAddSourceBtn = document.getElementById('submitAddSourceBtn');
+showAddSourceBtn.addEventListener('click', () => {
+  document.getElementById('addSourceForm').style.display = 'block';
+});
+cancelAddSourceBtn.addEventListener('click', () => {
+  document.getElementById('addSourceForm').style.display = 'none';
+});
+submitAddSourceBtn.addEventListener('click', addSourceAndRegenerate);
 const loading = document.getElementById('loading');
 const errorBox = document.getElementById('errorBox');
 const demoBanner = document.getElementById('demoBanner');
@@ -350,6 +404,9 @@ const proofSourceName = document.getElementById('proofSourceName');
 const clickHint = document.getElementById('clickHint');
 const exportScriptBtn = document.getElementById('exportScriptBtn');
 const exportSourcesBtn = document.getElementById('exportSourcesBtn');
+const renderVideoBtn = document.getElementById('renderVideoBtn');
+const videoArea = document.getElementById('videoArea');
+const videoPlayer = document.getElementById('videoPlayer');
 
 function confClass(doTinCay) { return "conf-" + String(doTinCay).replace(/\s+/g, "-"); }
 
@@ -434,16 +491,13 @@ function showError(msg) {
 
 async function removeSourceAndRewrite(sourceId) {
   const fileInput = document.getElementById('slideFile');
-  if (!fileInput.files.length) {
-    showError('Không tìm thấy lại file slide đã upload — vui lòng chạy lại từ đầu.');
-    return;
-  }
   errorBox.style.display = 'none';
   loading.innerHTML = '<span class="spinner"></span>Đang viết lại các câu phụ thuộc nguồn vừa loại…';
   loading.classList.add('show');
 
   const formData = new FormData();
-  formData.append('file', fileInput.files[0]);
+  if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+  formData.append('topic', document.getElementById('topic').value);
   formData.append('goal', document.getElementById('goal').value);
   formData.append('audience', document.getElementById('audience').value);
   formData.append('duration', document.getElementById('duration').value);
@@ -468,13 +522,66 @@ async function removeSourceAndRewrite(sourceId) {
 
     renderSources();
     renderSentences();
+    renderQaContentRows();
     proof.classList.remove('show');
     clickHint.style.display = 'block';
   } catch (err) {
     showError(err.message || 'Không viết lại được, vui lòng thử lại.');
   } finally {
     loading.classList.remove('show');
-    loading.innerHTML = '<span class="spinner"></span>Đang đọc slide và viết kịch bản…';
+    loading.innerHTML = '<span class="spinner"></span>Đang tìm nguồn và viết kịch bản…';
+  }
+}
+
+async function addSourceAndRegenerate() {
+  const url = document.getElementById('addSourceUrl').value.trim();
+  const title = document.getElementById('addSourceTitle').value.trim();
+  const excerpt = document.getElementById('addSourceExcerpt').value.trim();
+  if (!url || !title || !excerpt) {
+    showError('Cần nhập đủ URL, tiêu đề và đoạn trích để thêm nguồn.');
+    return;
+  }
+  const fileInput = document.getElementById('slideFile');
+  errorBox.style.display = 'none';
+  loading.innerHTML = '<span class="spinner"></span>Đang thêm nguồn và viết lại kịch bản…';
+  loading.classList.add('show');
+
+  const formData = new FormData();
+  if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+  formData.append('topic', document.getElementById('topic').value);
+  formData.append('goal', document.getElementById('goal').value);
+  formData.append('audience', document.getElementById('audience').value);
+  formData.append('duration', document.getElementById('duration').value);
+  formData.append('source_url', url);
+  formData.append('source_title', title);
+  formData.append('source_excerpt', excerpt);
+  formData.append('source_org', document.getElementById('addSourceOrg').value);
+  formData.append('source_date', document.getElementById('addSourceDate').value);
+
+  try {
+    const res = await fetch('/add-source', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    AppState.hoSoJson = data.hoSo;
+    AppState.kichBanJson = data.kichBan;
+    const mapped = mapOfficialToInternal(data.hoSo, data.kichBan);
+    AppState.sources = mapped.sources;
+    AppState.sentences = mapped.sentences;
+
+    renderSources();
+    renderSentences();
+    renderQaContentRows();
+    document.getElementById('addSourceForm').style.display = 'none';
+    ['addSourceUrl', 'addSourceTitle', 'addSourceOrg', 'addSourceDate', 'addSourceExcerpt']
+      .forEach(id => { document.getElementById(id).value = ''; });
+  } catch (err) {
+    showError(err.message || 'Không thêm được nguồn, vui lòng thử lại.');
+  } finally {
+    loading.classList.remove('show');
+    loading.innerHTML = '<span class="spinner"></span>Đang tìm nguồn và viết kịch bản…';
   }
 }
 
@@ -490,16 +597,20 @@ function resetViewBeforeRun() {
 
 runBtn.addEventListener('click', async () => {
   const fileInput = document.getElementById('slideFile');
-  if (!fileInput.files.length) { showError('Vui lòng chọn file PDF slide trước.'); return; }
+  const topicInput = document.getElementById('topic');
+  if (!topicInput.value.trim()) { showError('Vui lòng nhập chủ đề trước.'); return; }
 
   resetViewBeforeRun();
   loading.classList.add('show');
   runBtn.disabled = true;
   exportScriptBtn.disabled = true;
   exportSourcesBtn.disabled = true;
+  renderVideoBtn.disabled = true;
+  videoArea.style.display = 'none';
 
   const formData = new FormData();
-  formData.append('file', fileInput.files[0]);
+  if (fileInput.files.length) formData.append('file', fileInput.files[0]);
+  formData.append('topic', topicInput.value);
   formData.append('goal', document.getElementById('goal').value);
   formData.append('audience', document.getElementById('audience').value);
   formData.append('duration', document.getElementById('duration').value);
@@ -519,9 +630,11 @@ runBtn.addEventListener('click', async () => {
 
     renderSources();
     renderSentences();
+    renderQaContentRows();
     results.classList.add('show');
     exportScriptBtn.disabled = false;
     exportSourcesBtn.disabled = false;
+    renderVideoBtn.disabled = false;
   } catch (err) {
     // KHÔNG tự động render dữ liệu mẫu khi lỗi — chỉ hiện error state (xem PLAN.md mục 6)
     showError(err.message || 'Không gọi được hệ thống, vui lòng thử lại.');
@@ -540,6 +653,86 @@ exportSourcesBtn.addEventListener('click', () => {
   if (!AppState.hoSoJson) return;
   const out = Object.assign({ schema: 'hackathon-ho-so-nguon/1', ngayChay: new Date().toISOString() }, AppState.hoSoJson);
   downloadJSON(out, 'scriptscout-ho-so-nguon.json');
+});
+
+renderVideoBtn.addEventListener('click', async () => {
+  if (!AppState.kichBanJson) return;
+  errorBox.style.display = 'none';
+  videoArea.style.display = 'none';
+  renderVideoBtn.disabled = true;
+  const originalText = renderVideoBtn.textContent;
+  renderVideoBtn.textContent = '🎬 Đang dựng video (TTS thật, ~30-60 giây)…';
+
+  const formData = new FormData();
+  formData.append('kich_ban_json', JSON.stringify(AppState.kichBanJson));
+
+  try {
+    const res = await fetch('/render-video', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    videoPlayer.src = URL.createObjectURL(blob);
+    videoArea.style.display = 'block';
+  } catch (err) {
+    showError(err.message || 'Không dựng được video, vui lòng thử lại.');
+  } finally {
+    renderVideoBtn.disabled = false;
+    renderVideoBtn.textContent = originalText;
+  }
+});
+
+// ---- Feature B: QA nội dung video so với kịch bản đã duyệt ----
+const qaContentSection = document.getElementById('qaContentSection');
+const qaContentRows = document.getElementById('qaContentRows');
+const qaContentResults = document.getElementById('qaContentResults');
+const qaContentCheckBtn = document.getElementById('qaContentCheckBtn');
+
+function renderQaContentRows() {
+  const cau = (AppState.kichBanJson && AppState.kichBanJson.cau) || [];
+  const withLoi = cau.filter(c => c.loi);
+  if (!withLoi.length) { qaContentSection.style.display = 'none'; return; }
+  qaContentSection.style.display = 'block';
+  qaContentResults.innerHTML = '';
+  qaContentRows.innerHTML = withLoi.map(c => `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; align-items:start;">
+      <div><label style="font-size:0.8em;color:#666;">Câu ${c.n} — đã duyệt</label>
+        <div style="padding:6px;background:#f5f5f5;border-radius:4px;">${escapeHtml(c.loi)}</div></div>
+      <div><label style="font-size:0.8em;color:#666;">Thử sửa thành câu SAI để test AI (giả định người đọc/video lỡ đọc thế này)</label>
+        <input type="text" class="qa-video-line" data-n="${c.n}" value="${escapeHtml(c.loi)}" style="width:100%;"></div>
+    </div>`).join('');
+}
+
+const NHAN_LABEL = { "khop": "✅ Khớp", "lech-nhe": "⚠️ Lệch nhẹ", "lech-noi-dung": "❌ LỆCH NỘI DUNG" };
+
+qaContentCheckBtn.addEventListener('click', async () => {
+  const pairs = Array.from(document.querySelectorAll('.qa-video-line')).map(input => {
+    const n = parseInt(input.dataset.n);
+    const cau = AppState.kichBanJson.cau.find(c => c.n === n);
+    return { n, loiGoc: cau.loi, loiTrongVideo: input.value };
+  });
+  qaContentResults.innerHTML = '<span class="spinner"></span> Đang so sánh…';
+  try {
+    const formData = new FormData();
+    formData.append('pairs_json', JSON.stringify(pairs));
+    const res = await fetch('/qa-content', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    qaContentResults.innerHTML = '<table style="width:100%;border-collapse:collapse;">' +
+      '<tr style="text-align:left;border-bottom:1px solid #ddd;"><th>Câu</th><th>Nhãn</th><th>Mức</th><th>Giải thích</th><th>Duyệt</th></tr>' +
+      data.ketQua.map(r => `<tr style="border-bottom:1px solid #eee;">
+        <td>${r.n}</td><td>${NHAN_LABEL[r.nhan] || r.nhan}</td><td>${escapeHtml(r.mucNghiemTrong)}</td>
+        <td>${escapeHtml(r.giaiThich)}</td>
+        <td>${r.nhan === 'khop' ? '' : '<label><input type="checkbox"> Accept</label> <label><input type="checkbox"> Reject</label>'}</td>
+      </tr>`).join('') + '</table>';
+  } catch (err) {
+    qaContentResults.innerHTML = '';
+    showError(err.message || 'Không kiểm tra được, vui lòng thử lại.');
+  }
 });
 
 // ---- Demo offline: bấm CHỦ ĐỘNG mới xem, không bao giờ tự động bật khi /generate lỗi ----
@@ -569,10 +762,12 @@ demoBtn.addEventListener('click', () => {
 
   renderSources();
   renderSentences();
+  renderQaContentRows();
   results.classList.add('show');
   demoBanner.style.display = 'block';
   exportScriptBtn.disabled = false;
   exportSourcesBtn.disabled = false;
+  renderVideoBtn.disabled = false;
 });
 </script>
 

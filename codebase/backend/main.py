@@ -2,15 +2,21 @@ import base64
 import json
 import os
 import re
+import tempfile
 
 import pymupdf as fitz  # PyMuPDF
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
+from render_video import render as render_video_to_mp4
+
 from prompt import (
+    JUDGE_RELEVANCE_PROMPT,
     PROMPT_TEMPLATE,
+    QA_CONTENT_PROMPT,
     RETRY_SUFFIX,
     REWRITE_PROMPT_TEMPLATE,
     REWRITE_RETRY_SUFFIX,
@@ -23,6 +29,14 @@ client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 app = FastAPI()
 
 MAX_PAGES = 40  # đã test: slide thật(xem PLAN.md mục 6a)
+
+
+def estimate_target_sentences(duration_minutes: int) -> int:
+    """Theo mau-kich-ban.md: ~2,9 âm tiết/giây, 1 câu ~20 âm tiết ≈ 7 giây/câu. Phát hiện thật: kịch
+    bản 4-5 câu không thể nào đủ 4 phút — prompt trước đó không hề tính số câu cần theo thời lượng."""
+    return max(4, round(duration_minutes * 60 / 7))
+
+
 MAX_MB = 15  # TBD — tương tự
 
 
@@ -103,22 +117,27 @@ def find_ungrounded_numbers(data: dict, source_text: str) -> list[str]:
     mà câu đó trích dẫn — không phải chỉ cần có thật ở đâu đó trong tài liệu."""
     ho_so = data.get("hoSo", {})
     thongtin_by_id = {t["id"]: t for t in ho_so.get("thongTin", [])}
+    source_loai_by_id = {s["id"]: s.get("loai") for s in ho_so.get("nguon", [])}
     norm_source = _normalize_ws(source_text)
 
     problems = []
 
-    # Layer 4a — CHỈ bắt buộc khớp nguyên văn khi đoạn trích có chứa SỐ LIỆU (rủi ro thật nằm
-    # ở số bịa — case 1, 2). Đoạn trích thuần diễn giải khái niệm (không số) được nới lỏng vì
-    # test thật cho thấy AI hay nối 2 dòng slide bằng dấu chấm (source ngắt dòng, không chấm câu)
-    # → false positive nhiều nếu bắt khớp tuyệt đối 100% mọi đoạn trích, kể cả đoạn vô hại.
+    # Layer 4a — bắt buộc khớp nguyên văn khi đoạn trích có chứa SỐ LIỆU (rủi ro thật nằm ở số
+    # bịa — case 1, 2), HOẶC khi nguồn trích là "web" (web_text có sẵn đầy đủ, không có rủi ro
+    # false positive do slide ngắt dòng — phát hiện thật: chế độ không-slide để AI tự tìm nguồn,
+    # AI từng gắn "doanTrich" hoàn toàn bịa, không liên quan gì tới nội dung thật của URL, cho một
+    # nguồn web — không số nên lọt qua bản kiểm cũ). Đoạn trích thuần diễn giải khái niệm từ SLIDE
+    # (không số) vẫn được nới lỏng vì test thật cho thấy AI hay nối 2 dòng slide bằng dấu chấm
+    # (source ngắt dòng, không chấm câu) → false positive nếu bắt khớp tuyệt đối mọi đoạn trích.
     for t in ho_so.get("thongTin", []):
         for bc in t.get("bangChung", []):
             raw = bc.get("doanTrich", "") or ""
-            if not NUMBER_PATTERN.search(raw):
-                continue  # không có số → rủi ro thấp, không bắt buộc khớp tuyệt đối
+            is_web = source_loai_by_id.get(bc.get("nguonId")) == "web"
+            if not NUMBER_PATTERN.search(raw) and not is_web:
+                continue  # không có số, và không phải nguồn web → rủi ro thấp, không bắt buộc khớp tuyệt đối
             doan_trich = _normalize_ws(LEAD_IN_PREFIX.sub("", raw))
             if len(doan_trich) >= 4 and doan_trich not in norm_source:
-                problems.append(f"thongTin {t.get('id')} trích dẫn có số nhưng không khớp text gốc: \"{doan_trich[:60]}...\"")
+                problems.append(f"thongTin {t.get('id')} trích dẫn không khớp text gốc (nguồn {'web' if is_web else 'slide'}): \"{doan_trich[:60]}...\"")
 
     # Layer 4b — số liệu trong LỜI ĐỌC của câu phải nằm trong đúng "doanTrich" mà câu đó trích
     # dẫn (không phải "noiDung" — vì noiDung là AI tự diễn giải, có thể lẫn số bịa vào đó)
@@ -229,24 +248,133 @@ def validate_output(data: dict, source_text: str) -> None:
                 f"{len(distinct_sources)} nguồn độc lập thật sự trong bangChung — có thể khai khống mức xác minh"
             )
 
+    # Layer 6 — "loi" (lời đọc) không được chứa chữ số, theo đúng mau-kich-ban.md của BTC
+    # ("Không có chữ số" — máy đọc từng ký tự, số phải viết bằng chữ). "chuTrenManHinh" không bị
+    # ràng buộc này.
+    for cau in kich_ban.get("cau", []):
+        loi = cau.get("loi")
+        if loi and re.search(r"\d", loi):
+            raise ValueError(f"Câu {cau.get('n')} có chữ số trong 'loi' (phải viết bằng chữ): {loi!r}")
+
+
+def check_citation_relevance(data: dict) -> list[str]:
+    """Layer 7 — kiểm ngữ nghĩa: "doanTrich" tồn tại thật trong nguồn (Layer 4a) không có nghĩa nó
+    THỰC SỰ xác nhận đúng "noiDung" đang gắn vào. Phát hiện thật: khi 2 nguồn nói khác nhau về cùng
+    1 sự kiện (vd năm ImageNet ra đời), AI từng gắn thêm 2 trích dẫn CÓ THẬT nhưng nói chuyện khác
+    (AlexNet 2012, 1 câu tiếng Anh chung chung) làm "bằng chứng phụ" để tự nâng khống soNguonXacNhan
+    lên "da-xac-minh" — không lớp nào trước đó bắt được vì trích dẫn không bịa, chỉ là không liên
+    quan. Dùng 1 lượt AI riêng, độc lập, để chấm độ liên quan thật của từng cặp thongTin-bangChung."""
+    ho_so = data.get("hoSo", {})
+    pairs = []
+    for t in ho_so.get("thongTin", []):
+        for i, bc in enumerate(t.get("bangChung", [])):
+            pairs.append({
+                "thongTinId": t.get("id"), "noiDung": t.get("noiDung", ""),
+                "index": i, "doanTrich": bc.get("doanTrich", ""),
+            })
+    if not pairs:
+        return []
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": JUDGE_RELEVANCE_PROMPT.format(
+                pairs_json=json.dumps(pairs, ensure_ascii=False))}],
+            response_format={"type": "json_object"},
+        )
+        result = json.loads(resp.choices[0].message.content)
+    except Exception:
+        return []  # judge lỗi thì bỏ qua, không chặn luồng chính — tránh single point of failure
+
+    irrelevant = {(r.get("thongTinId"), r.get("index")) for r in result.get("khongLienQuan", [])}
+    if not irrelevant:
+        return []
+
+    problems = []
+    for t in ho_so.get("thongTin", []):
+        bc_list = t.get("bangChung", [])
+        remaining = {bc.get("nguonId") for i, bc in enumerate(bc_list) if (t.get("id"), i) not in irrelevant}
+        declared = t.get("soNguonXacNhan")
+        flagged = [i for i in range(len(bc_list)) if (t.get("id"), i) in irrelevant]
+        if not flagged:
+            continue
+        if declared is not None and declared > len(remaining):
+            problems.append(
+                f"thongTin {t.get('id')}: trích dẫn tại index {flagged} bị chấm KHÔNG thực sự liên quan "
+                f"tới nội dung '{t.get('noiDung', '')[:50]}...' nhưng vẫn tính vào soNguonXacNhan={declared}"
+            )
+        elif declared is None:
+            problems.append(
+                f"thongTin {t.get('id')}: trích dẫn tại index {flagged} không thực sự liên quan tới nội "
+                f"dung '{t.get('noiDung', '')[:50]}...'"
+            )
+    return problems
+
+
+def check_content_conformance(pairs: list[dict]) -> list[dict]:
+    """Feature B — Script<->Video Content Conformance QA (BA.md mục 5, build trước điều kiện tự
+    đặt theo quyết định có chủ đích 17/9 trưa — xem BA.md). So ngữ nghĩa "loiGoc" (kịch bản đã
+    duyệt) với "loiTrongVideo" (lời thực tế trong video đã dựng), gắn nhãn khớp/lệch nhẹ/lệch nội
+    dung. Chỉ gọi AI cho cặp THỰC SỰ khác nhau — so string trước để đỡ tốn phí cho câu giống hệt."""
+    results_by_n: dict[int, dict] = {}
+    to_check = []
+    for p in pairs:
+        if _normalize_ws(p["loiGoc"]) == _normalize_ws(p["loiTrongVideo"]):
+            results_by_n[p["n"]] = {
+                "n": p["n"], "nhan": "khop", "mucNghiemTrong": "thap", "giaiThich": "Giống hệt bản duyệt",
+            }
+        else:
+            to_check.append(p)
+
+    if to_check:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": QA_CONTENT_PROMPT.format(
+                pairs_json=json.dumps(to_check, ensure_ascii=False))}],
+            response_format={"type": "json_object"},
+        )
+        parsed = json.loads(resp.choices[0].message.content)
+        for r in parsed.get("ketQua", []):
+            results_by_n[r["n"]] = r
+
+    return [results_by_n.get(p["n"], {
+        "n": p["n"], "nhan": "loi", "mucNghiemTrong": "khong-ro", "giaiThich": "Không chấm được",
+    }) for p in pairs]
+
+
+@app.post("/qa-content")
+async def qa_content_endpoint(pairs_json: str = Form(...)):
+    """pairs_json: JSON list [{"n": 1, "loiGoc": "...", "loiTrongVideo": "..."}, ...]"""
+    pairs = json.loads(pairs_json)
+    return {"ketQua": check_content_conformance(pairs)}
+
 
 @app.post("/generate")
 async def generate(
-    file: UploadFile = File(...),
+    topic: str = Form(...),
     goal: str = Form(...),
     audience: str = Form(...),
     duration: int = Form(...),
+    file: UploadFile | None = File(None),
 ):
-    pdf_bytes = await file.read()
-    doc = load_pdf(pdf_bytes)  # tự raise HTTPException nếu vượt giới hạn trang/dung lượng
-    source_text = extract_pdf_text(doc)
-    images_b64 = pdf_to_images_base64(doc)  # ảnh "low detail" — chỉ để hiểu bố cục/sơ đồ, không để trích dẫn
-    web_text = search_web_sources(goal)  # đúng lát cắt gợi ý BTC: "AI tìm 3 nguồn, chấm tin cậy"
+    # Đúng bài toán gốc C3: input chỉ cần chủ đề/mục tiêu/đối tượng/thời lượng, KHÔNG bắt buộc đưa
+    # sẵn tài liệu — slide là tuỳ chọn để bổ sung, không phải điều kiện bắt buộc để chạy.
+    if file is not None:
+        pdf_bytes = await file.read()
+        doc = load_pdf(pdf_bytes)  # tự raise HTTPException nếu vượt giới hạn trang/dung lượng
+        source_text = extract_pdf_text(doc)
+        images_b64 = pdf_to_images_base64(doc)  # ảnh "low detail" — chỉ để hiểu bố cục/sơ đồ, không để trích dẫn
+    else:
+        source_text = ""
+        images_b64 = []
+    web_text = search_web_sources(f"{topic}. {goal}")  # đúng lát cắt gợi ý BTC: "AI tìm 3 nguồn, chấm tin cậy"
     all_source_text = source_text + "\n\n" + web_text  # dùng chung cho validate_output() Layer 4
 
     prompt_text = PROMPT_TEMPLATE.format(
-        goal=goal, audience=audience, duration=duration,
-        slide_text=source_text, web_text=web_text or "(không tìm được nguồn ngoài, chỉ dùng slide)",
+        topic=topic, goal=goal, audience=audience, duration=duration,
+        target_sentences=estimate_target_sentences(duration),
+        slide_text=source_text or "(người dùng không upload slide — dùng nguồn mạng làm nguồn chính)",
+        web_text=web_text or "(không tìm được nguồn ngoài, chỉ dùng slide)",
     )
 
     # 3 lần thử (không phải 2) — test thật cho thấy lỗi ID không khớp (nguonId trong bangChung
@@ -257,6 +385,71 @@ async def generate(
         try:
             data = call_openai(attempt_prompt, images_b64)
             validate_output(data, all_source_text)
+            relevance_problems = check_citation_relevance(data)
+            if relevance_problems:
+                raise ValueError(f"Trích dẫn không thực sự liên quan tới nội dung: {relevance_problems}")
+            return data
+        except (json.JSONDecodeError, ValueError) as e:
+            last_error = e
+            continue
+
+    raise HTTPException(status_code=502, detail=f"AI_INVALID_JSON: {last_error}")
+
+
+@app.post("/add-source")
+async def add_source(
+    topic: str = Form(...),
+    goal: str = Form(...),
+    audience: str = Form(...),
+    duration: int = Form(...),
+    source_url: str = Form(...),
+    source_title: str = Form(...),
+    source_excerpt: str = Form(...),
+    source_org: str = Form(""),
+    source_date: str = Form(""),
+    file: UploadFile | None = File(None),
+):
+    """Đúng "Sản phẩm tối thiểu" C3: màn hình duyệt nguồn phải cho "thêm nguồn của mình". Người dùng
+    tự dán URL + đoạn trích (không tự động cào trang — không có tầng fetch riêng), AI viết lại kịch
+    bản với nguồn này được ép buộc đưa vào cùng slide/web như một nguồn thật, qua lại đúng validate
+    đã test kỹ ở /generate thay vì viết logic vá riêng rủi ro hơn."""
+    if file is not None:
+        pdf_bytes = await file.read()
+        doc = load_pdf(pdf_bytes)
+        source_text = extract_pdf_text(doc)
+        images_b64 = pdf_to_images_base64(doc)
+    else:
+        source_text = ""
+        images_b64 = []
+    web_text = search_web_sources(f"{topic}. {goal}")
+    user_source_block = (
+        "\n\n--- NGUỒN NGƯỜI DÙNG TỰ THÊM (coi như 1 nguồn web bình thường) ---\n"
+        f"URL: {source_url}\nTiêu đề: {source_title}\nTác giả/Tổ chức: {source_org or 'không rõ'}\n"
+        f"Ngày đăng: {source_date or 'không rõ'}\n"
+        f"Trích dẫn: {source_excerpt}\n--- HẾT NGUỒN NGƯỜI DÙNG TỰ THÊM ---"
+    )
+    web_text_combined = (web_text or "") + user_source_block
+    all_source_text = source_text + "\n\n" + web_text_combined
+
+    prompt_text = PROMPT_TEMPLATE.format(
+        topic=topic, goal=goal, audience=audience, duration=duration,
+        target_sentences=estimate_target_sentences(duration),
+        slide_text=source_text or "(người dùng không upload slide — dùng nguồn mạng làm nguồn chính)",
+        web_text=web_text_combined,
+    ) + (
+        "\n\nLƯU Ý: khối NGUỒN TÌM ĐƯỢC TRÊN MẠNG có 1 đoạn đánh dấu '--- NGUỒN NGƯỜI DÙNG TỰ THÊM ---' — "
+        "đây là nguồn người dùng tự cung cấp, hãy coi như một nguồn web bình thường và dùng nếu liên quan "
+        "tới chủ đề, không được bỏ qua chỉ vì nó không do bạn tự tìm."
+    )
+
+    last_error = None
+    for attempt_prompt in (prompt_text, prompt_text + RETRY_SUFFIX, prompt_text + RETRY_SUFFIX):
+        try:
+            data = call_openai(attempt_prompt, images_b64)
+            validate_output(data, all_source_text)
+            relevance_problems = check_citation_relevance(data)
+            if relevance_problems:
+                raise ValueError(f"Trích dẫn không thực sự liên quan tới nội dung: {relevance_problems}")
             return data
         except (json.JSONDecodeError, ValueError) as e:
             last_error = e
@@ -267,13 +460,14 @@ async def generate(
 
 @app.post("/rewrite")
 async def rewrite(
-    file: UploadFile = File(...),
+    topic: str = Form(...),
     goal: str = Form(...),
     audience: str = Form(...),
     duration: int = Form(...),
     ho_so_json: str = Form(...),
     kich_ban_json: str = Form(...),
     removed_source_id: str = Form(...),
+    file: UploadFile | None = File(None),
 ):
     """Đúng lát cắt gợi ý BTC: "người viết loại một nguồn → chỉ câu phụ thuộc viết lại".
     Chỉ viết lại đúng các câu phụ thuộc vào nguồn bị loại, giữ nguyên các câu khác — không phải
@@ -299,16 +493,21 @@ async def rewrite(
         # không câu nào phụ thuộc nguồn bị loại — chỉ cần bỏ nguồn khỏi hồ sơ, kịch bản giữ nguyên
         return {"hoSo": remaining_ho_so, "kichBan": kich_ban, "rewrittenNs": []}
 
-    pdf_bytes = await file.read()
-    doc = load_pdf(pdf_bytes)
-    source_text = extract_pdf_text(doc)
-    images_b64 = pdf_to_images_base64(doc)
-    web_text = search_web_sources(goal)
+    if file is not None:
+        pdf_bytes = await file.read()
+        doc = load_pdf(pdf_bytes)
+        source_text = extract_pdf_text(doc)
+        images_b64 = pdf_to_images_base64(doc)
+    else:
+        source_text = ""
+        images_b64 = []
+    web_text = search_web_sources(f"{topic}. {goal}")
     all_source_text = source_text + "\n\n" + web_text
 
     rewrite_prompt = REWRITE_PROMPT_TEMPLATE.format(
-        goal=goal, audience=audience, duration=duration,
-        slide_text=source_text, web_text=web_text or "(không tìm được nguồn ngoài)",
+        topic=topic, goal=goal, audience=audience, duration=duration,
+        slide_text=source_text or "(không có slide — dùng nguồn mạng làm nguồn chính)",
+        web_text=web_text or "(không tìm được nguồn ngoài)",
         removed_source_id=removed_source_id,
         remaining_ho_so=json.dumps(remaining_ho_so, ensure_ascii=False),
         affected_sentences=json.dumps(affected_cau, ensure_ascii=False),
@@ -341,13 +540,34 @@ async def rewrite(
             new_kich_ban = dict(kich_ban)
             new_kich_ban["cau"] = [cau_by_n[n] for n in sorted(cau_by_n)]
 
-            validate_output({"hoSo": new_ho_so, "kichBan": new_kich_ban}, all_source_text)
+            merged_data = {"hoSo": new_ho_so, "kichBan": new_kich_ban}
+            validate_output(merged_data, all_source_text)
+            relevance_problems = check_citation_relevance(merged_data)
+            if relevance_problems:
+                raise ValueError(f"Trích dẫn không thực sự liên quan tới nội dung: {relevance_problems}")
             return {"hoSo": new_ho_so, "kichBan": new_kich_ban, "rewrittenNs": sorted(affected_ns)}
         except (json.JSONDecodeError, ValueError, KeyError) as e:
             last_error = e
             continue
 
     raise HTTPException(status_code=502, detail=f"AI_INVALID_JSON: {last_error}")
+
+
+@app.post("/render-video")
+async def render_video_endpoint(kich_ban_json: str = Form(...)):
+    """Bonus "NÂNG CAO" tích hợp thẳng vào web — xem render_video.py. Chạy đồng bộ (chặn tiến
+    trình lúc TTS+ffmpeg), chấp nhận được cho demo hackathon 1 người dùng, không phải production."""
+    kich_ban = json.loads(kich_ban_json)
+    if not kich_ban.get("cau"):
+        raise HTTPException(status_code=400, detail="Kịch bản trống, không có gì để dựng video")
+    fd, out_path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    try:
+        render_video_to_mp4(kich_ban, out_path)
+    except Exception as e:
+        os.remove(out_path)
+        raise HTTPException(status_code=502, detail=f"Dựng video lỗi: {e}")
+    return FileResponse(out_path, media_type="video/mp4", filename="scriptscout-video.mp4")
 
 
 # Static files (frontend) — MOUNT SAU CÙNG, sau mọi route API, để không nuốt mất /generate
