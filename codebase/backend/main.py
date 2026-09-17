@@ -110,7 +110,7 @@ def _normalize_ws(s: str) -> str:
     return s.rstrip(".!?,;:")
 
 
-def find_ungrounded_numbers(data: dict, source_text: str) -> list[str]:
+def find_ungrounded_numbers(data: dict, source_text: str, user_context_text: str = "") -> list[str]:
     """Layer 4 — CHẶT HƠN bản đầu. Bản đầu chỉ kiểm số có xuất hiện ĐÂU ĐÓ trong cả tài liệu
     (dễ trùng ngẫu nhiên với văn bản dài — case 2 trong golden-set.md: AI bịa "công ty VN tiết
     kiệm 40% chi phí", gắn citation vào 1 thongTin THẬT nhưng nói chuyện khác (rút ngắn 90→30
@@ -122,6 +122,7 @@ def find_ungrounded_numbers(data: dict, source_text: str) -> list[str]:
     thongtin_by_id = {t["id"]: t for t in ho_so.get("thongTin", [])}
     source_loai_by_id = {s["id"]: s.get("loai") for s in ho_so.get("nguon", [])}
     norm_source = _normalize_ws(source_text)
+    norm_context = _normalize_ws(user_context_text)
 
     problems = []
 
@@ -166,7 +167,13 @@ def find_ungrounded_numbers(data: dict, source_text: str) -> list[str]:
             numbers = {n.strip().rstrip(",.") for n in NUMBER_PATTERN.findall(text)}
             numbers = {n for n in numbers if len(n) >= 2}
             for num in numbers:
-                if num not in cited_evidence:
+                # num_context: số đó do CHÍNH NGƯỜI DÙNG gõ (topic/goal/audience/duration) — không
+                # phải sự thật AI tự thêm, nên không tính là "bịa". Thiếu điều kiện này thì mọi câu
+                # KHÔNG có trích dẫn (nguon: [] — hợp lệ cho câu dẫn nhập/chuyển ý) sẽ tự động fail
+                # với BẤT KỲ số nào trong "chuTrenManHinh" vì cited_evidence luôn rỗng — phát hiện
+                # thật ở golden-set case 1 lượt chạy lại: câu chào có "năm 2024" (lặp lại từ mục
+                # tiêu người dùng) bị chấm oan là số liệu bịa.
+                if num not in cited_evidence and num not in norm_context:
                     problems.append(
                         f"Câu {cau.get('n')} có số '{num}' trong '{field}' nhưng đoạn trích dẫn của câu đó không có số này"
                     )
@@ -206,7 +213,7 @@ def _as_list(value):
     return value
 
 
-def validate_output(data: dict, source_text: str) -> None:
+def validate_output(data: dict, source_text: str, user_context_text: str = "") -> None:
     """4 lớp kiểm tra — raise ValueError nếu hỏng. JSON hợp lệ cú pháp KHÔNG có nghĩa
     là kịch bản đáng tin — đây là chỗ bảo vệ đúng tiêu chí nặng nhất của rubric C3
     (25%: "câu truy được về nguồn và trích dẫn chính xác"). Layer 4 (số liệu) thêm sau
@@ -235,7 +242,7 @@ def validate_output(data: dict, source_text: str) -> None:
                 raise ValueError(f"Câu {cau.get('n')} trỏ tới thongTin không tồn tại: {nguon_id}")
 
     # Layer 4 — số liệu phải có thật trong slide (không chỉ có ID trích dẫn hợp lệ)
-    ungrounded = find_ungrounded_numbers(data, source_text)
+    ungrounded = find_ungrounded_numbers(data, source_text, user_context_text)
     if ungrounded:
         raise ValueError(f"Số liệu có thể bị bịa, không tìm thấy trong slide gốc: {ungrounded}")
 
@@ -463,6 +470,7 @@ async def generate(
         images_b64 = []
     web_text = search_web_sources(f"{topic}. {goal}")  # đúng lát cắt gợi ý BTC: "AI tìm 3 nguồn, chấm tin cậy"
     all_source_text = source_text + "\n\n" + web_text  # dùng chung cho validate_output() Layer 4
+    user_context_text = f"{topic} {goal} {audience} {duration}"  # cho phép số do chính user gõ (không phải AI bịa)
 
     prompt_text = PROMPT_TEMPLATE.format(
         topic=topic, goal=goal, audience=audience, duration=duration,
@@ -479,7 +487,7 @@ async def generate(
     for attempt_prompt in (prompt_text, prompt_text + RETRY_SUFFIX, prompt_text + RETRY_SUFFIX):
         try:
             data = call_openai(attempt_prompt, images_b64)
-            validate_output(data, all_source_text)
+            validate_output(data, all_source_text, user_context_text)
             relevance_problems = check_citation_relevance(data)
             if relevance_problems:
                 raise ValueError(f"Trích dẫn không thực sự liên quan tới nội dung: {relevance_problems}")
@@ -525,6 +533,7 @@ async def add_source(
     )
     web_text_combined = (web_text or "") + user_source_block
     all_source_text = source_text + "\n\n" + web_text_combined
+    user_context_text = f"{topic} {goal} {audience} {duration}"  # cho phép số do chính user gõ (không phải AI bịa)
 
     prompt_text = PROMPT_TEMPLATE.format(
         topic=topic, goal=goal, audience=audience, duration=duration,
@@ -542,7 +551,7 @@ async def add_source(
     for attempt_prompt in (prompt_text, prompt_text + RETRY_SUFFIX, prompt_text + RETRY_SUFFIX):
         try:
             data = call_openai(attempt_prompt, images_b64)
-            validate_output(data, all_source_text)
+            validate_output(data, all_source_text, user_context_text)
             relevance_problems = check_citation_relevance(data)
             if relevance_problems:
                 raise ValueError(f"Trích dẫn không thực sự liên quan tới nội dung: {relevance_problems}")
@@ -615,6 +624,7 @@ async def rewrite(
         images_b64 = []
     web_text = search_web_sources(f"{topic}. {goal}")
     all_source_text = source_text + "\n\n" + web_text
+    user_context_text = f"{topic} {goal} {audience} {duration}"  # cho phép số do chính user gõ (không phải AI bịa)
 
     rewrite_prompt = REWRITE_PROMPT_TEMPLATE.format(
         topic=topic, goal=goal, audience=audience, duration=duration,
@@ -654,7 +664,7 @@ async def rewrite(
             new_kich_ban["cau"] = [cau_by_n[n] for n in sorted(cau_by_n)]
 
             merged_data = {"hoSo": new_ho_so, "kichBan": new_kich_ban}
-            validate_output(merged_data, all_source_text)
+            validate_output(merged_data, all_source_text, user_context_text)
             relevance_problems = check_citation_relevance(merged_data)
             if relevance_problems:
                 raise ValueError(f"Trích dẫn không thực sự liên quan tới nội dung: {relevance_problems}")
