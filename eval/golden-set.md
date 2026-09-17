@@ -122,3 +122,13 @@ Bộ 20 case gốc ở trên không phủ hết 5 "chỗ sẽ khó" mà đề C3
 | 23 | Chủ đề gần như không có tài liệu tiếng Việt ("test-time compute scaling") | Không bịa nguồn tiếng Việt giả — được phép dùng nguồn tiếng Anh, vẫn viết lời đọc tiếng Việt | ✅ **Đạt** — AI tự tìm đúng 3 nguồn tiếng Anh uy tín (OpenAI, arXiv, Berkeley), không bịa nguồn Việt Nam, kịch bản vẫn viết bằng tiếng Việt tự nhiên |
 
 **Phát hiện quan trọng nhất từ đợt test này:** case 22 lộ ra một lớp lỗ hổng hoàn toàn khác với các case 1-20 — không phải "bịa trích dẫn" mà là "**trích dẫn thật nhưng không liên quan**, dùng để khai khống mức độ xác minh". Đây đúng nguyên văn "chỗ khó nhất" mà đề C3 mô tả ("phân biệt tìm được tài liệu với tài liệu đáng tin" + "số liệu quan trọng cần ≥2 nguồn độc lập xác nhận"), và hoá ra hệ thống trước đó **chưa thực sự giải quyết được** dù đã tưởng là xong (Layer 5 chỉ kiểm số lượng, không kiểm quan hệ ngữ nghĩa). Sau khi thêm Layer 7, đã kiểm tra lại không phá vỡ hành vi đúng ở case thường.
+
+## Case 24 — độ dài kịch bản không scale theo thời lượng yêu cầu (chưa giải quyết, ghi nhận trung thực)
+
+| Input | Kỳ vọng | Kết quả thật |
+|---|---|---|
+| `d1` · "Lịch sử phát triển AI" · Học viên mới bắt đầu · **4 phút** | Theo `mau-kich-ban.md` (~2,9 âm tiết/giây, ~7 giây/câu), 4 phút cần khoảng 34 câu | ❌ **Chưa đạt** — hệ thống chỉ ra 3-7 câu tuỳ lần chạy, ngắn hơn nhiều so với thời lượng yêu cầu |
+
+**Đã thử sửa và rollback:** thêm hướng dẫn "bắt buộc đủ số câu" vào prompt → **phản tác dụng nghiêm trọng**: AI bắt đầu lặp lại thông tin đã dùng nhưng gắn cho nguồn khác (kể cả nguồn có thật) để đủ số câu — Layer 4a/Layer 7 đúng đắn chặn lại, khiến tỉ lệ fail (502) tăng vọt thay vì có kịch bản dài hơn. Đã rollback về hướng dẫn mềm ("nên đạt khoảng N câu nếu nguồn đủ chất liệu, thà ngắn hơn còn hơn bịa/gắn sai nguồn") — an toàn hơn (không còn tăng fail rate) nhưng độ dài vẫn không đạt.
+
+**Nguyên nhân gốc:** slide mẫu (`d1`/`d2`, 6 trang) chỉ có ~5-7 sự kiện/khái niệm riêng biệt — không đủ chất liệu thật để viết 30+ câu không lặp/không bịa. Đây là giới hạn về **lượng dữ liệu nguồn**, không phải lỗi logic có thể sửa bằng prompt. Hướng giải quyết thật (chưa làm, để lại): cho phép AI viết câu diễn giải/mở rộng ý nghĩa sâu hơn cho mỗi sự kiện đã có (không thêm sự kiện mới) một cách có kiểm soát hơn, hoặc chấp nhận trong tài liệu hướng dẫn rằng thời lượng dài cần slide nguồn phong phú hơn tương ứng.
