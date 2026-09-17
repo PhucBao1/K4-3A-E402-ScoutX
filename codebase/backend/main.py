@@ -140,17 +140,12 @@ def find_ungrounded_numbers(data: dict, source_text: str) -> list[str]:
             if len(doan_trich) >= 4 and doan_trich not in norm_source:
                 problems.append(f"thongTin {t.get('id')} trích dẫn không khớp text gốc (nguồn {'web' if is_web else 'slide'}): \"{doan_trich[:60]}...\"")
 
-    # Layer 4b — số liệu trong LỜI ĐỌC của câu phải nằm trong đúng "doanTrich" mà câu đó trích
-    # dẫn (không phải "noiDung" — vì noiDung là AI tự diễn giải, có thể lẫn số bịa vào đó)
+    # Layer 4b — số liệu trong LỜI ĐỌC (và giờ cả CHỮ TRÊN MÀN HÌNH) của câu phải nằm trong đúng
+    # "doanTrich" mà câu đó trích dẫn (không phải "noiDung" — vì noiDung là AI tự diễn giải, có
+    # thể lẫn số bịa vào đó). "chuTrenManHinh" thêm sau khi phát hiện: không lớp nào từng kiểm
+    # trường này dù nó cũng hiện số liệu ra màn hình cho người xem — AI có thể vô tình để lệch số
+    # giữa "loi" (đã validate) và "chuTrenManHinh" (chưa từng validate) mà không ai bắt được.
     for cau in data.get("kichBan", {}).get("cau", []):
-        loi = cau.get("loi", "") or ""
-        # .rstrip(",.") — regex bắt số hay dính dấu phẩy/chấm cuối câu ("2017," thay vì "2017"),
-        # phát hiện thật khi test case 9 (mốc lịch sử) khiến so khớp sai hàng loạt vì lỗi này
-        numbers = {n.strip().rstrip(",.") for n in NUMBER_PATTERN.findall(loi)}
-        numbers = {n for n in numbers if len(n) >= 2}
-        if not numbers:
-            continue
-
         cited_evidence = ""
         for tid in _as_list(cau.get("nguon")):
             t = thongtin_by_id.get(tid)
@@ -160,11 +155,17 @@ def find_ungrounded_numbers(data: dict, source_text: str) -> list[str]:
                 cited_evidence += " " + (bc.get("doanTrich", "") or "")
         cited_evidence = _normalize_ws(cited_evidence)
 
-        for num in numbers:
-            if num not in cited_evidence:
-                problems.append(
-                    f"Câu {cau.get('n')} nói số '{num}' nhưng đoạn trích dẫn của câu đó không có số này"
-                )
+        for field in ("loi", "chuTrenManHinh"):
+            text = cau.get(field, "") or ""
+            # .rstrip(",.") — regex bắt số hay dính dấu phẩy/chấm cuối câu ("2017," thay vì "2017"),
+            # phát hiện thật khi test case 9 (mốc lịch sử) khiến so khớp sai hàng loạt vì lỗi này
+            numbers = {n.strip().rstrip(",.") for n in NUMBER_PATTERN.findall(text)}
+            numbers = {n for n in numbers if len(n) >= 2}
+            for num in numbers:
+                if num not in cited_evidence:
+                    problems.append(
+                        f"Câu {cau.get('n')} có số '{num}' trong '{field}' nhưng đoạn trích dẫn của câu đó không có số này"
+                    )
     return problems
 
 
