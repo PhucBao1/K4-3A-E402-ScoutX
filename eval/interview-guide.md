@@ -16,7 +16,7 @@
 ## 👤 Phỏng vấn #1: Khảo sát quy trình & Thời gian viết kịch bản
 
 * **Thời gian:** 19:15, ngày 16/09/2026
-* **Đối tượng:** Lab Coach kiêm Thành viên Studio Team (Chuyên trách sản xuất nội dung bài giảng)
+* **Đối tượng:** **Hải DM** — Lab Coach kiêm Thành viên Studio Team (Chuyên trách sản xuất nội dung bài giảng)
 * **Hình thức:** Phỏng vấn trực tiếp tại khu vực Lab / Studio
 
 ### Ghi chép chi tiết:
@@ -39,7 +39,7 @@
 ## 👤 Phỏng vấn #2: Khảo sát công cụ AI & Luồng QA/QC kiểm duyệt
 
 * **Thời gian:** 19:30, ngày 16/09/2026
-* **Đối tượng:** **Thái Hoàng** — Lab Coach kiêm Thành viên Studio Team
+* **Đối tượng:** **Thành Phạm** — Lab Coach kiêm Thành viên Studio Team
 * **Hình thức:** Phỏng vấn trực tiếp tại khu vực Lab
 
 ### Ghi chép chi tiết:
@@ -65,9 +65,9 @@
 - **Điểm nghẽn:** Người viết phải tự tra cứu thuật ngữ ngoài mạng để sửa kịch bản; khâu kiểm duyệt phải dùng 2 AI (Claude + Codex) chấm chéo nhưng vẫn phải duyệt tay cuối cùng.
 
 ### 2. Danh sách Trích dẫn nguyên văn (Verbatim Quotes cho `spec.md` §1)
-1. *"Thời gian viết đến lúc duyệt — viết 5h (nhưng tầm 2.5h dựng chính) + duyệt 3h."* — (Studio Team Coach)
-2. *"Video 3-5p cần từ 35-50 câu kịch bản."* — (Studio Team Coach)
-3. *"Có dùng AI nhưng phải tự tìm kiếm thuật ngữ bên ngoài rồi chỉnh lại kịch bản."* — (Studio Team Coach)
-4. *"Review lại kịch bản: Claude tạo kịch bản + Codex review lại kịch bản chấm chéo."* — (Lab Coach Thái Hoàng)
-5. *"Quy trình hiện tại là làm hết từ đầu đến cuối mới feedback."* — (Lab Coach Thái Hoàng)
-6. *"Đoạn QA QC con người feedback + AI tự nghe và xử lý khi lỗi... cần luồng QA tự động hoá."* — (Lab Coach Thái Hoàng)
+1. *"Thời gian viết đến lúc duyệt — viết 5h (nhưng tầm 2.5h dựng chính) + duyệt 3h."* — (Lab Coach Hải DM)
+2. *"Video 3-5p cần từ 35-50 câu kịch bản."* — (Lab Coach Hải DM)
+3. *"Có dùng AI nhưng phải tự tìm kiếm thuật ngữ bên ngoài rồi chỉnh lại kịch bản."* — (Lab Coach Hải DM)
+4. *"Review lại kịch bản: Claude tạo kịch bản + Codex review lại kịch bản chấm chéo."* — (Lab Coach Thành Phạm)
+5. *"Quy trình hiện tại là làm hết từ đầu đến cuối mới feedback."* — (Lab Coach Thành Phạm)
+6. *"Đoạn QA QC con người feedback + AI tự nghe và xử lý khi lỗi... cần luồng QA tự động hoá."* — (Lab Coach Thành Phạm)

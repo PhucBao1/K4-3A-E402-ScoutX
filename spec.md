@@ -18,9 +18,9 @@ Loại: [ ] Tối ưu tính năng có sẵn  [x] Tính năng mới
     1. *"Thời gian viết đến lúc duyệt — viết 5h (nhưng tầm 2.5h dựng chính) + duyệt 3h."* — (Lab Coach kiêm Studio Team)
     2. *"Video 3-5p: 35-50 câu."* — (Lab Coach kiêm Studio Team)
     3. *"Có dùng AI nhưng phải tự tìm kiếm thuật ngữ bên ngoài rồi chỉnh lại kịch bản."* — (Lab Coach kiêm Studio Team)
-    4. *"Review lại kịch bản: Claude tạo kịch bản + Codex review lại kịch bản chấm chéo."* — (Lab Coach Thái Hoàng kiêm Studio Team)
-    5. *"Quy trình hiện tại là làm hết từ đầu đến cuối mới feedback."* — (Lab Coach Thái Hoàng kiêm Studio Team)
-    6. *"Đoạn QA QC con người feedback + AI tự nghe và xử lý khi lỗi... cần luồng QA tự động hoá."* — (Lab Coach Thái Hoàng kiêm Studio Team)
+    4. *"Review lại kịch bản: Claude tạo kịch bản + Codex review lại kịch bản chấm chéo."* — (Lab Coach Thành Phạm kiêm Studio Team)
+    5. *"Quy trình hiện tại là làm hết từ đầu đến cuối mới feedback."* — (Lab Coach Thành Phạm kiêm Studio Team)
+    6. *"Đoạn QA QC con người feedback + AI tự nghe và xử lý khi lỗi... cần luồng QA tự động hoá."* — (Lab Coach Thành Phạm kiêm Studio Team)
 
 ## §2. Impact & quyết định chọn
 - Bảng impact ≥3 ứng viên (bao nhiêu người · tần suất · tốn gì mỗi lần · khả thi) — **3 pain point thật trong cùng phạm vi ScriptScout** (dữ liệu định lượng trích xuất từ phỏng vấn 2 Lab Coach kiêm Studio team trong `eval/interview-guide.md`):
@@ -142,9 +142,8 @@ tường minh, không phải thêm validate số liệu).
   - **Nguyễn Việt Dũng (2A202602533):** Phỏng vấn thật theo Mom Test, ghi log vào `eval/interview-guide.md`, chịu trách nhiệm Evidence (§1-§2) trong `spec.md`, chuẩn bị nhật ký `validation/` cho CP5.
   - **Nguyễn Văn Biển (2A202602416):** Cùng phỏng vấn, chịu trách nhiệm §3 (nghiên cứu giải pháp tương tự), §8 (phân công) trong `spec.md`, hỗ trợ chuẩn bị vòng `validation/`.
   - **Nguyễn Phúc Bảo (2A202602925 - Đội trưởng):** Thiết kế & code backend FastAPI + gpt-4o-mini (`codebase/backend/main.py`), prompt & 7 lớp validate chống bịa số liệu/trích dẫn, xây dựng & chạy bộ golden set 20 case thật (`eval/golden-set.md`), phụ trách demo.
-- Willing users (≥2 tên) + kế hoạch vòng validation *(bonus, nếu làm)*:
-  - 1. **Thái Hoàng** (Lab Coach kiêm Studio team) — đã phỏng vấn vòng 1, đồng ý thử nghiệm prototype để đối chiếu thời gian viết kịch bản.
-  - 2. **Khải** (học viên) — đồng ý dùng thử prototype để kiểm tra mức dễ hiểu của kịch bản và khả năng truy ngược từng câu về nguồn.
+- Willing users + kế hoạch vòng validation *(bonus, nếu làm)*: **chưa đủ ≥2 tên độc lập** — tự khai trung thực thay vì khai khống.
+  - 1. **Thành Phạm** (Lab Coach kiêm Studio team, đã là 1 trong 2 người phỏng vấn ở `eval/interview-guide.md`) — đồng ý thử nghiệm prototype để đối chiếu thời gian viết kịch bản. Lưu ý: đây là **cùng người** đã cung cấp bằng chứng phỏng vấn ở §1, không phải người thứ 3 độc lập — cần tìm thêm ≥1 người ngoài phạm vi đã phỏng vấn trước CP5 nếu muốn willing-user test có giá trị kiểm chứng chéo thật sự.
   - Kế hoạch CP5: giao mỗi người cùng một chủ đề và thời lượng; ghi thời gian hoàn thành, số câu có nguồn truy được, điểm bị kẹt và quote nguyên văn. Sau đó đối chiếu với quality bar và ghi ít nhất một quyết định thay đổi vào §9 Changelog.
 - Multi-prototype (nếu làm): trục khác biệt của ≥2 phương án + lý do chọn: chưa làm.
 - Phase 2 (không thuộc lát cắt chính, xem đầy đủ trong `BA.md`):
