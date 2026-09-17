@@ -22,7 +22,7 @@ Loại: [ ] Tối ưu tính năng có sẵn  [x] Tính năng mới
   | Pain (ứng viên) | Số người | Tần suất | Chi phí mỗi lần | Impact | Bằng chứng hiện có | Khả thi build 47,5h |
   |---|---|---|---|---|---|---|
   | **Viết kịch bản có nguồn (C3 gốc — đã chọn để build)** | TODO | Mỗi video mới | TODO (nhiều ngày viết + rủi ro sửa lại) | TODO | Yếu — mining mô tả BTC, chưa phỏng vấn ai | Cao — đã chạy AI thật (CP3) |
-  | Feature A — Format QA hậu kỳ | TODO | Mỗi video, sau khi dựng | TODO (chụp/dừng frame, đo bằng mắt) | TODO | **Mạnh nhất — 2 lab coach độc lập cùng xác nhận** (`BA.md` mục 2) | Cao — rule-based + OCR, chưa build |
+  | Feature A — Format QA hậu kỳ | TODO | Mỗi video, sau khi dựng | TODO (chụp/dừng frame, đo bằng mắt) | TODO | Mạnh — nhưng mới **1 lab coach** xác nhận (`BA.md` mục 2) | Cao — rule-based + OCR, chưa build |
   | Feature B — Content QA hậu kỳ | TODO | Mỗi video, sau khi dựng | TODO (nghe hết video, so tay từng câu) | TODO | Mạnh — nhưng mới **1 lab coach** xác nhận | Trung bình — cần so ngữ nghĩa, chưa build |
 
   **Kế hoạch lấy số thật:** dùng câu Q1-Q3 trong `BA.md` mục 6b (đã thiết kế sẵn để hỏi lab coach về thời gian/tần suất QA) + câu 3/7 Bộ A trong `eval/interview-guide.md` (hỏi người viết kịch bản).
@@ -30,9 +30,9 @@ Loại: [ ] Tối ưu tính năng có sẵn  [x] Tính năng mới
 - Ứng viên ĐÃ LOẠI + vì sao: **Không loại hẳn Feature A/B — hoãn sang Phase 2, không phải bỏ.** Ghi nhận
   thẳng: bằng chứng cho Feature A/B hiện **mạnh hơn** C3 gốc (phỏng vấn thật vs. chỉ mining mô tả BTC). Lý
   do vẫn ưu tiên build C3 trước: (1) đã có sẵn đà từ CP2 (prototype chạy được từ trước), đổi hướng ngay lúc
-  này rủi ro không kịp có gì hoàn chỉnh để nộp; (2) Feature B cần thêm ≥1 phỏng vấn nữa xác nhận pain lặp
-  lại trước khi đầu tư build (mới có 1 lab coach xác nhận) — riêng Feature A đã có **2 lab coach độc lập**
-  xác nhận, đủ điều kiện build ngay ở Phase 2 không cần chờ thêm.
+  này rủi ro không kịp có gì hoàn chỉnh để nộp; (2) cả Feature A lẫn Feature B đều mới có **đúng 1 lab coach
+  xác nhận mỗi feature** — chưa đạt ngưỡng ≥2 người tự đặt, cần thêm phỏng vấn xác nhận pain lặp lại trước
+  khi đầu tư build cả hai, không riêng Feature B (bản trước ghi nhầm Feature A đã đủ 2 người).
 - Ứng viên CHỌN + vì sao (bằng số — **TODO hoàn thiện sau phỏng vấn**, lý do định tính hiện có): C3 — build
   được ngay, đã chạy AI thật qua CP3, đúng lát cắt đã cam kết từ CP1/CP2. Feature A/B giữ trong `spec.md` §8
   làm kế hoạch Phase 2, không phải bị loại vĩnh viễn.
