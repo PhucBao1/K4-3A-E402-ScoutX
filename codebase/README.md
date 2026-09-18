@@ -1,45 +1,82 @@
-# ScriptScout — codebase
+# ScriptScout - Codebase
 
-## Chạy thử
-- **Link demo live (CP2):** https://phucbao1.github.io/K4-3A-E402-ScoutX/codebase/index.html
-- Hoặc mở trực tiếp `index.html` bằng trình duyệt (không cần server/build).
+Prototype cuối ở mức **Working**. Luồng chính dùng FastAPI và OpenAI thật để nhận chủ đề, tự tìm nguồn,
+tạo kịch bản có provenance theo từng câu và hỗ trợ loại nguồn/viết lại câu phụ thuộc.
 
-## Lát cắt đã chốt (khác bản gốc đề C3)
-Đề gốc C3 yêu cầu agent **tự tìm tài liệu trên mạng**. Nhóm ScoutX đơn giản hoá cho vừa sức trong 47,5 giờ:
-**input = slide bài giảng có sẵn** (nguồn chính, thay vì tự tìm web từ đầu), **AI bổ sung thêm nguồn ngoài**
-(paper, tin/thông báo chính thức, biểu đồ, ví dụ thực tế) để kịch bản có chiều sâu hơn chỉ đọc slide,
-**output = kịch bản** theo đúng mẫu `mau-kich-ban.md` của BTC — mỗi câu gắn đúng một nguồn (trang slide
-hoặc nguồn ngoài), bấm câu hoặc bấm nguồn để xem lại đúng chỗ chứng minh, kèm hồ sơ nguồn có loại/độ tin
-cậy/lý do tin cậy theo đúng tinh thần `ho-so-nguon-mau.json` của BTC.
-Việc "tự tìm mọi nguồn từ đầu qua web search thật + tự chấm độ tin cậy bằng agent riêng" đưa vào
-**non-goal** (ghi trong `spec.md` §4) — CP3 chỉ cần thay các bước mock bằng ≥1 lời gọi AI thật.
+## Bản nào dùng để demo?
 
-## Mức prototype: Mock (CP2)
-Flow bấm hết được từ đầu đến cuối, nhưng **chưa có lời gọi AI thật**:
+- **Working prototype:** `backend/main.py` + `backend/static/index.html`.
+- **Snapshot CP2:** `index.html` ở thư mục này là bản Mock cũ, giữ lại để chứng minh checkpoint; không dùng
+  làm demo cuối và không đại diện trạng thái hiện tại.
+
+## Chạy Working prototype
+
+```bash
+cd codebase/backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# Điền OPENAI_API_KEY vào .env
+uvicorn main:app --port 8000
+```
+
+Mở `http://localhost:8000`.
+
+## Lát cắt đang chạy
+
+Người viết nhập bốn trường bắt buộc: chủ đề, mục tiêu bài học, đối tượng học và thời lượng. Slide PDF là
+tùy chọn; nếu không có slide, agent tự tìm nguồn web. Sau khi tạo kịch bản, reviewer có thể:
+
+- Bấm một câu để mở đúng thông tin, đoạn trích và tài liệu gốc.
+- Thêm một nguồn của mình bằng URL và đoạn trích.
+- Loại một nguồn; hệ thống chỉ viết lại câu phụ thuộc và giữ nguyên câu khác.
+- Xuất kịch bản và hồ sơ nguồn theo schema của BTC.
+
+AI tạo draft và gắn nguồn; con người duyệt cuối trước khi sử dụng. Hệ thống không tự publish.
+
+## Trạng thái tính năng
 
 | Phần | Trạng thái |
 |---|---|
-| Form chọn slide / mục tiêu / đối tượng / thời lượng | Thật (input thật, chưa validate) |
-| "Đọc slide + tìm thêm nguồn bổ sung" | **Mock** — trả về cố định: 3 trang slide (3,4,5) + 4 nguồn ngoài (1 paper, 1 tin chính thức, 1 biểu đồ, 1 ví dụ thực tế), sau độ trễ giả (1.4s) |
-| "Viết kịch bản gắn nguồn" | **Mock** — 13 câu cố định (rút gọn từ nội dung slide + tư liệu công khai có thật), không đổi theo input |
-| Bấm câu hoặc bấm một nguồn trong hồ sơ tài liệu → xem đúng chỗ chứng minh (kèm loại/độ tin cậy/lý do) | Thật (logic hiển thị thật, dữ liệu nguồn là mock) |
+| `/generate`: topic → research → script có nguồn | Working, AI thật |
+| Slide PDF tùy chọn | Working |
+| Web search và chấm độ tin cậy | Working, AI thật |
+| Bấm câu xem evidence | Working |
+| `/add-source`: thêm nguồn người dùng | Working |
+| `/rewrite`: loại nguồn và chỉ sửa câu phụ thuộc | Working |
+| Demo offline có banner | Working, dữ liệu mẫu được ghi nhãn |
+| Content QA hậu kỳ | Prototype bonus qua `/qa-content*` |
+| Format QA hậu kỳ | Prototype bonus qua `/format-check`, `/qa-full` |
+| Render video | Prototype bonus, không thuộc lát cắt C3 chính |
 
-Nội dung mock: 3 trang slide lấy tay từ `data/vlearn-pack/slides/d1-slide-hackathon.pdf` (trang 3-5, rút
-gọn); 4 nguồn ngoài (paper "Attention Is All You Need", thông báo ra mắt ChatGPT của OpenAI, biểu đồ dựng
-lại từ mốc thời gian trang 5, ví dụ Gmail lọc spam) là thông tin công khai có thật, đơn giản hoá cho demo —
-không commit file PDF gốc vào repo, đúng quy định bảo mật data.
+## Validation và guardrail chính
 
-## Xuất file (để dựng video / dùng ở bước sau)
-Hai nút cuối bảng kết quả xuất **thật** (không mock) hai file JSON, đúng schema của BTC:
+Trước khi trả output, backend kiểm:
 
-| Nút | File | Schema | Dùng để |
-|---|---|---|---|
-| Xuất kịch bản | `scriptscout-kich-ban.json` | `hackathon-kich-ban/1` (đúng `mau-kich-ban.md`) — có `loi`, `chuTrenManHinh`, `yDoHinh`, `nguon` | Gửi cho người dựng video, hoặc làm input cho C4 StoryboardAI |
-| Xuất hồ sơ tài liệu | `scriptscout-ho-so-nguon.json` | `hackathon-ho-so-nguon/1` (đúng `ho-so-nguon-mau.json`) | Người duyệt xem lại toàn bộ nguồn + độ tin cậy ngoài giao diện |
+1. ID evidence phải trỏ tới nguồn có thật.
+2. ID ở từng câu phải trỏ tới thông tin có thật.
+3. Số liệu trong lời đọc/chữ màn hình phải có đúng evidence.
+4. Trích dẫn web phải tồn tại trong source text.
+5. Số nguồn xác nhận không được khai khống.
+6. Lời đọc không chứa chữ số theo chuẩn kịch bản BTC.
+7. Citation phải thực sự liên quan tới claim.
+8. Topic ngoài phạm vi AI/công nghệ bị chặn trước web search.
 
-`mucTieu`/`doiTuong`/`thoiLuongPhutDuKien` trong file xuất lấy từ ô input thật trên form, còn `cau`/`nguon` vẫn là data mock — CP3 nối AI thật thì hai nút này không cần đổi, chỉ đổi nguồn dữ liệu `MOCK`.
+Chi tiết implementation: `backend/main.py`, `backend/prompt.py`. Kết quả kiểm thử và failure được giữ tại
+`../eval/golden-set.md`; quality bar chính thức nằm trong `../spec.md` §7.
 
-## Kế hoạch CP3
-Thay phần mock "đọc slide" + "tìm nguồn bổ sung" + "viết câu" bằng ≥1 lời gọi AI thật (đọc slide/PDF +
-tìm/thẩm định nguồn ngoài + LLM sinh kịch bản có cite), giữ nguyên UI/flow đã có ở CP2. Log/trace của lời
-gọi thật sẽ lưu trong `eval/`.
+## Phần thật và phần mock
+
+- Luồng chính không dùng hardcode khi bấm Generate.
+- Nút `Xem ví dụ demo offline` dùng dữ liệu cố định và luôn hiện banner cảnh báo.
+- API lỗi không tự chuyển sang dữ liệu mẫu.
+- `codebase/index.html` là Mock CP2 riêng, không được dùng để tuyên bố kết quả Working.
+
+## Giới hạn hiện tại
+
+- Chưa tự fetch URL bất kỳ để kiểm link sống/freshness; `/add-source` dùng đoạn trích người dùng dán.
+- Chưa xác minh source lineage để biết hai publisher có sao chép cùng nguồn gốc hay không.
+- `/rewrite` tìm web lại, nên tập nguồn có thể thay đổi giữa hai lượt.
+- Chưa có tài khoản, phân quyền, lưu phiên, hàng đợi hay benchmark nhiều người dùng.
+- Clean run chính thức gần nhất đạt 65%, chưa đạt quality bar 70%; xem `eval/golden-set.md`.

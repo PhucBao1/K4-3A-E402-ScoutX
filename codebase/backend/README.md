@@ -56,7 +56,8 @@ từ OpenAI — chạy thật và xem dashboard OpenAI để có số chính xá
   `web_search_preview` của OpenAI và nội dung người dùng tự dán ở `/add-source`).
 - AI đôi khi trả lời chung chung thay vì liệt kê cụ thể khi được yêu cầu chi tiết (xem case #7, #18 trong
   `eval/golden-set.md`).
-- Khi mục tiêu hoàn toàn ngoài phạm vi, AI cải thiện nhưng chưa từ chối tường minh 100% các lần.
+- Chủ đề ngoài phạm vi AI/công nghệ được guardrail độc lập chặn trước web search; đây vẫn là AI Judge nên
+  cần giữ regression test và không xem là bảo đảm tuyệt đối ngoài phạm vi bộ test hiện tại.
 - `render_video.py` vẽ ảnh minh hoạ TĨNH theo `yDoHinh` (không phải animation/chuyển động thật).
 - `canhBao` (cảnh báo nguồn cũ) có trong schema nhưng AI áp dụng không đều — xem `eval/golden-set.md`.
 - `/rewrite` gọi lại web search mỗi lần, có thể khiến trích dẫn cũ (câu không đổi) fail giả khi validate

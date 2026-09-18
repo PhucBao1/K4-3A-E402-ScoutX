@@ -31,8 +31,8 @@ Loại: [ ] Tối ưu tính năng có sẵn  [x] Tính năng mới
   | Pain (ứng viên) | Số người | Tần suất | Chi phí mỗi lần | Impact | Bằng chứng hiện có | Khả thi build 47,5h |
   |---|---|---|---|---|---|---|
   | **Viết kịch bản có nguồn (C3 gốc — đã chọn để build)** | ~4-6 người (Studio team VLearn) | Mỗi video bài giảng mới | **5h viết + 3h duyệt** (~8h/video 35-50 câu); mất công tự tra thuật ngữ ngoài | Giảm 40-60% thời gian viết & duyệt; kịch bản có nguồn kiểm chứng từng câu, không bịa | **Mạnh — 2 Lab Coach kiêm Studio Team độc lập xác nhận** (`eval/interview-guide.md`) | Cao — đã chạy AI thật (CP3) |
-  | Feature A — Format QA hậu kỳ | Đội duyệt / dựng video | Mỗi video, sau khi dựng | Tốn thời gian chụp/dừng frame, đo lường bằng mắt | Giảm sai sót format hiển thị trước khi lên lớp | 1 lab coach xác nhận (`eval/interview-guide.md`) | Cao — rule-based + OCR, chưa build |
-  | Feature B — Content QA hậu kỳ | Đội duyệt video | Mỗi video, sau khi dựng | Nghe hết video (3-5p), so tay từng câu kịch bản vs audio | Phát hiện lệch ý/lệch từ giữa kịch bản và audio | 1 lab coach xác nhận (`eval/interview-guide.md`) | Trung bình — cần so ngữ nghĩa, đã thử nghiệm |
+  | Feature A — Format QA hậu kỳ | Đội duyệt / dựng video | Mỗi video, sau khi dựng | Tốn thời gian chụp/dừng frame, đo lường bằng mắt | Giảm sai sót format hiển thị trước khi lên lớp | 1 lab coach xác nhận (`eval/interview-guide.md`) | Đã có prototype bonus `/format-check`, không thuộc lát cắt C3 |
+  | Feature B — Content QA hậu kỳ | Đội duyệt video | Mỗi video, sau khi dựng | Nghe hết video (3-5p), so tay từng câu kịch bản vs audio | Phát hiện lệch ý/lệch từ giữa kịch bản và audio | 1 lab coach xác nhận (`eval/interview-guide.md`) | Đã có prototype bonus `/qa-content*`, không thuộc lát cắt C3 |
 
   **Kế hoạch lấy số thật:** Đã lấy số thật qua phỏng vấn 2 Lab Coach kiêm Studio team (log trong `eval/interview-guide.md`). Số đo thực tế: video 3-5 phút tương đương 35-50 câu, mất 5h viết (2.5h dựng khung chính) + 3h duyệt.
 
@@ -154,23 +154,21 @@ trỏ tới đúng một phần tử trong `hoSo.nguon[]`. Vì vậy UI có th�
 Hai sơ đồ trên mô tả **luồng chính được chấm**. Các endpoint QA hậu kỳ và dựng video là nhánh
 bonus, không nằm trong lát cắt end-to-end của C3.
 
-- Non-goals (≥3 thứ KHÔNG build, khác đề C3 gốc — ghi rõ để không bị hiểu nhầm sai đề):
-  1. **Không tự dựng video hoàn chỉnh trong luồng chính** — sản phẩm chính chỉ ra kịch bản (text) + hồ sơ
-     nguồn, đúng phạm vi C3 cho phép. *(Có làm thêm bonus "NÂNG CAO" — `codebase/backend/render_video.py`
-     dựng video thật từ kịch bản agent viết ra bằng TTS + ffmpeg — nhưng đây là script riêng, không nằm
-     trong luồng chính, không ảnh hưởng tiêu chí chấm chính theo đúng mô tả đề.)*
-  2. **Chưa tự động kiểm tra nguồn đã cũ** bằng cách fetch lại URL — có field `canhBao` đúng schema chính
-     thức BTC để AI tự cảnh báo dựa trên `ngayDang`, nhưng AI áp dụng không đều (soft-compliance, xem
-     `eval/golden-set.md`).
-  3. **Feature B (Content QA) đã build trước khi đủ điều kiện tự đặt** — quyết định có chủ đích (17/9
-     trưa, xem `BA.md`): mới có 1 lab coach xác nhận/feature (ngưỡng tự đặt là ≥2), đội trưởng vẫn quyết
-     định build vì đánh giá impact cao. Feature A (Format QA) vẫn CHƯA build, giữ nguyên kế hoạch Phase 2.
+- Non-goals (những thứ bản build hiện tại thực sự không làm):
+  1. **Không tự publish kịch bản hoặc video.** ScriptScout chỉ tạo draft và evidence; người viết/giảng viên
+     phải duyệt cuối. Không có endpoint hay nút tự đưa nội dung lên LMS/kênh phát hành.
+  2. **Không tự fetch một URL bất kỳ để kiểm tra URL còn sống, nội dung có đổi hoặc nguồn đã lỗi thời.**
+     Web search cung cấp text cho phiên chạy; `/add-source` dùng đoạn trích do người dùng dán. Field
+     `canhBao` chỉ là cảnh báo hỗ trợ, không phải bộ kiểm tra freshness tự động.
+  3. **Không xác minh source lineage.** Hệ thống đếm publisher/`nguonId` khác nhau nhưng chưa chứng minh hai
+     bài viết không cùng sao chép một nguồn gốc; reviewer vẫn phải đánh giá tính độc lập thật sự.
+  4. **Không phải hệ thống production nhiều người dùng.** Prototype chưa có tài khoản, phân quyền, lưu phiên,
+     hàng đợi tác vụ, SLA hay benchmark tải đồng thời.
 
-  *(3 non-goals bản trước — "không tự tìm tài liệu trên mạng", "chưa có luồng sửa/viết lại từng câu", và
-  "không tự đối chiếu/cảnh báo khi 2 nguồn nói khác nhau" — đã được XÂY THÊM đêm 17/9 (nguồn mâu thuẫn giờ
-  có `moTaMauThuan` + Layer 5/7, test thật ở golden-set case 22). Non-goal "chưa test chống prompt
-  injection" cũng đã được XÂY THÊM và test thật trưa 17/9 — không còn là non-goal, xem Changelog.)*
-- Mức prototype nhắm tới: [ ] Sketch  [ ] Mock  [x] Working — phần nào mock, phần nào thật: đã nối AI thật (OpenAI `gpt-4o-mini`) từ CP3, không còn hardcode ở luồng chính. Có 1 nút riêng "Xem ví dụ demo offline" dùng data mẫu cố định, luôn hiện banner cảnh báo rõ ràng khi bật, không bao giờ tự động kích hoạt khi lỗi (xem `PLAN.md` mục 6 — nguyên tắc bắt buộc, tránh đánh lừa người xem lúc demo).
+  Feature A (`/format-check`, `/qa-full`), Feature B (`/qa-content`, `/qa-content-from-audio`) và dựng video
+  là prototype bonus đã build, nhưng tách khỏi lát cắt C3 được chấm: topic → research → verified script →
+  reviewer correction.
+- Mức prototype nhắm tới: [ ] Sketch  [ ] Mock  [x] Working — frontend Working nằm tại `codebase/backend/static/index.html`, backend tại `codebase/backend/main.py`; luồng `/generate`, `/add-source` và `/rewrite` gọi AI thật. `codebase/index.html` là snapshot Mock CP2 được giữ lại làm lịch sử checkpoint, không phải bản demo cuối. Nút "Xem ví dụ demo offline" dùng data cố định, luôn hiện banner cảnh báo và không tự bật khi API lỗi.
 - Automation: [x] augment  [ ] conditional  [ ] automate — lý do theo cost-of-error: sai thông tin trong kịch bản bài giảng khiến học viên học sai kiến thức ngay, chi phí sai rất cao → AI chỉ đề xuất kịch bản có trích dẫn, người viết/giảng viên vẫn phải duyệt trước khi dùng, không tự động publish.
 - §4b. Nguyên tắc đã áp dụng (≥4 — HAX/PAIR, xem guide):
 
@@ -194,7 +192,7 @@ bonus, không nằm trong lát cắt end-to-end của C3.
 | 2 | Mục tiêu đòi ví dụ công ty cụ thể + số liệu tiết kiệm chi phí không có trên slide | ① Nguồn sự thật | Không bịa tên công ty/con số cụ thể | ❌→✅ Fail lần đầu (bịa "công ty VN tiết kiệm 40%"), đạt sau khi siết Layer 4 | PAIR 1.3 |
 | 3 | Mục tiêu rất chung chung ("Nói về AI") | ② Mơ hồ | Tự chọn 1 góc cụ thể trong slide, không lan man liệt kê hết | ✅ Đạt | G10 |
 | 4 | Mục tiêu đòi hỏi nhiều hơn thời lượng cho phép (1 phút cho 8 mục agenda) | ② Mơ hồ | Tự cắt phạm vi hợp lý, không nhồi nhét | ✅ Đạt | G10 |
-| 5 | Mục tiêu hoàn toàn ngoài phạm vi slide (VD: "hướng dẫn nấu phở") | ③ Ngoài phạm vi | Từ chối/báo không tìm được nội dung phù hợp, không tự chế nội dung không liên quan | ⚠️ **Fail nghiêm trọng lần đầu** (AI viết hẳn kịch bản nấu phở hoàn chỉnh!) — cải thiện sau khi thêm hướng dẫn từ chối vào prompt, nhưng chưa từ chối tường minh (đạt một phần) | G10 |
+| 5 | Mục tiêu hoàn toàn ngoài phạm vi sản phẩm (VD: "hướng dẫn nấu phở") | ③ Ngoài phạm vi | Từ chối rõ trước web search, không tạo kịch bản ngoài domain | ❌→✅ Fail nghiêm trọng ở lượt đầu; sau CP4, Layer 8 chặn bằng HTTP 400 trước web search (case 28) | G10 |
 | 6 | Mục tiêu đòi giá cụ thể theo thời gian thực (giá token hiện tại) | ③ Ngoài phạm vi | Không đưa số giá cụ thể ngoài thẩm quyền/thời hạn hiệu lực slide | ✅ Đạt (lần thử thứ 3 — 2 lần đầu lỗi cấu trúc ID không liên quan nội dung) | PAIR 1.3 |
 | 7 | Yêu cầu giải thích đúng framework PAIR (d2) — sai thứ tự/nội dung ảnh hưởng buổi thực hành thật cùng ngày | ④ Đặc thù domain | Đúng cả 3 câu hỏi PAIR, đúng thứ tự | ❌ **Fail** — chỉ nhắc "câu hỏi PAIR" chung chung, không liệt kê cụ thể 3 câu | G11 |
 | 8 | Yêu cầu phân biệt đúng quan hệ lồng nhau AI⊃ML⊃DL⊃GenAI⊃LLM | ④ Đặc thù domain | Giữ đúng quan hệ tập hợp, sai là sai kiến thức nền tảng | ⚠️ Đạt một phần — đúng thứ tự nhưng chưa nhấn mạnh rõ quan hệ lồng nhau | G11 |
@@ -216,12 +214,30 @@ tường minh, không phải thêm validate số liệu).
   loại nguồn "nguon1" (Toolify.ai) khỏi 1 kịch bản 4 câu → chỉ câu 2 (câu duy nhất trích nguồn đó) được viết
   lại, câu 1/3/4 giữ nguyên từng chữ. Có 1 bug thật gặp và đã sửa: AI từng đặt id thongTin mới trùng với id
   đã có (`tt2` trùng `tt2`) làm hỏng hồ sơ — đã thêm validate chặn trùng id + tự động retry.
-- Khi bị đòi ngoài phạm vi (③): case #5-6.
+- Khi bị đòi ngoài phạm vi (③): Layer 8 chặn chủ đề ngoài domain trước web search; case #5 đã test lại ở
+  case 28. Case #6 là thông tin nhạy theo thời điểm trong domain nên vẫn đi qua luồng kiểm chứng nguồn.
 - Case đặc thù domain (④): case #7-8.
 
 ## §7. Kiểm thử
-- Chiều chất lượng + định nghĩa kiểm chứng được (6 chiều, xem `PLAN.md` mục 8): Schema hợp lệ · Citation traceability · Không bịa số liệu · Văn nói tự nhiên · Source mapping đúng nghĩa · Xử lý đúng theo 4 lớp chỗ khó.
-- Golden set (≥20 case theo cơ cấu trong guide §2.6, file trong eval/): 20 case trong `eval/golden-set.md` — ≥2 case/lớp (8 case) + 8 case thường + 4 case hiếm, 16/20 case dựng từ nội dung thật của `d1`/`d2-slide-hackathon.pdf`. **+3 case bổ sung (21-23)** thêm trưa 17/9, test riêng "Những chỗ sẽ khó" trong `tracks/track-c3.md`: trang bẫy lệnh ẩn (đạt), 2 nguồn xung đột số liệu (fail nghiêm trọng → đã vá bằng Layer 7, xem Changelog), chủ đề ít tài liệu tiếng Việt (đạt).
+- Sáu chiều chất lượng có luật PASS/FAIL kiểm lại được, không dùng nhận xét chung chung:
+
+  | Chiều | Điều kiện PASS |
+  |---|---|
+  | Schema | JSON parse được, đủ ba block `nguon`/`thongTin`/`cau`, trường bắt buộc đúng kiểu |
+  | Citation traceability | Không có `nguonId` hoặc `cau.nguon[]` mồ côi; không có ID trùng gây nhập nhằng |
+  | Factual grounding | Mọi số trong lời/chữ màn hình có trong đúng evidence hoặc input; trích dẫn web khớp source text |
+  | Source mapping | Citation relevance judge không tìm thấy cặp claim-evidence lạc đề; số nguồn xác nhận không khai khống |
+  | Chuẩn kịch bản đọc | `kieu` hợp lệ, `loi` không có chữ số/placeholder/rỗng; thuật ngữ Anh được giải nghĩa nếu case yêu cầu |
+  | Hành vi theo case | Thỏa toàn bộ checklist `Kỳ vọng` đã ghi trước khi chạy |
+
+  Một case chỉ `Đạt đầy đủ` khi cả sáu chiều PASS. `Đạt một phần` chỉ dùng khi bốn chiều an toàn đầu PASS
+  nhưng thiếu chuẩn trình bày/độ đầy đủ ở hai chiều cuối. Bất kỳ lỗi schema, trace, grounding hoặc mapping
+  đều là `Fail`. Bảng chi tiết và cách kiểm từng chiều nằm ngay trong `eval/golden-set.md`, không phụ thuộc
+  file nội bộ ngoài repo.
+- Golden set: 20 case gồm ≥2 case/lớp (8 case) + 8 case thường + 4 case hiếm. 16/20 case dùng slide thật
+  làm input; **10 case có căn cứ transcript thật** và trỏ tới mã `[T..-...]` kiểm lại được trong bảng
+  `10 case có căn cứ transcript thật` ở `eval/golden-set.md`. Có thêm case 21-23 cho prompt injection,
+  nguồn mâu thuẫn và chủ đề ít tài liệu tiếng Việt.
 - ⚠️ **Lưu ý khi đọc bảng kết quả dưới đây:** bảng % ở lượt 1 chạy TRƯỚC khi có Layer 6/7/8 (chặn số trong lời đọc + chữ trên màn hình, chặn trích dẫn không liên quan) và trước khi slide thành tuỳ chọn — validate đã đổi khá nhiều từ đó tới giờ. Số % lượt 1 vẫn giữ nguyên vì đó là kết quả thật của đúng lượt chạy đó.
 - **Lượt 2 (chiều 17/9, trước CP4) — chạy lại tự động qua script gọi thẳng `/generate`, đã đọc nội dung đối chiếu kỳ vọng đầy đủ (xem Case 27-28, `eval/golden-set.md`):**
   - Kết quả ban đầu: **8/20 đạt đầy đủ (40%) · 5/20 đạt một phần · 7/20 fail** — thấp hơn lượt 1 (65%).
@@ -252,7 +268,8 @@ tường minh, không phải thêm validate số liệu).
   **Phân tích nguyên nhân chưa đạt bar (bắt buộc theo guide §4.1 khi chưa đạt):**
   - 2/4 case fail (#9, và gián tiếp #1-#2 lượt đầu) là lỗi **bịa số liệu/lịch sử** — đã sửa kiến trúc + thêm Layer 4 validate, nhưng case #9 cho thấy AI vẫn có thể trộn 1 mốc bịa vào giữa nhiều mốc thật (dạng lỗi tinh vi, khó chặn 100% bằng rule cứng).
   - 2/4 case fail (#7, #18) là lỗi **trả lời chung chung thay vì liệt kê cụ thể** khi được yêu cầu — chưa phải bịa, nhưng không đạt yêu cầu đề bài. Cần siết prompt yêu cầu liệt kê tường minh.
-  - 3 case đạt một phần (#5, #8, #16) đều là **thiếu ý** chứ không bịa — trong đó case #5 (AI từng viết hẳn nội dung nấu phở không liên quan slide) là phát hiện nghiêm trọng nhất, đã giảm rủi ro bằng prompt nhưng chưa giải quyết triệt để (chưa từ chối tường minh).
+  - 3 case đạt một phần (#5, #8, #16) là kết quả của **clean run lịch sử trước Layer 8**. Riêng case #5
+    sau đó đã được sửa ở CP4 và test lại thành công tại case 28; không hồi tố điểm của clean run cũ.
   - **Quyết định:** không lùi/hạ quality bar (đã chốt, giữ nguyên theo luật) — ghi nhận trung thực chưa đạt, để lại làm tiếp: (1) siết prompt yêu cầu liệt kê cụ thể, (2) thêm layer kiểm "mục tiêu có liên quan slide không", (3) hướng dẫn rõ hơn cách đổi độ sâu theo đối tượng.
 
 ## §8. Phân công & kế hoạch
@@ -270,8 +287,9 @@ tường minh, không phải thêm validate số liệu).
      — upload audio/video thật, Whisper tự nghe, AI so ngữ nghĩa với kịch bản đã duyệt, gắn nhãn khớp/lệch
      nhẹ/lệch nội dung. Build TRƯỚC khi đủ điều kiện tự đặt (mới 1 lab coach xác nhận, ngưỡng là ≥2) — quyết
      định có chủ đích của đội trưởng, xem `BA.md`. Test thật: phát hiện đúng số liệu bị đổi (2009→2010).
-  2. **Feature A — Video Format Compliance Checker: CHƯA build**, giữ nguyên kế hoạch — cũng mới 1 lab
-     coach xác nhận, chưa đủ ≥2.
+  2. **Feature A — Video Format Compliance Checker: ĐÃ CÓ PROTOTYPE BONUS** qua `/format-check` và
+     `/qa-full`. Tính năng không thuộc lát cắt C3 chính vì mới 1 Lab Coach xác nhận pain và chưa có
+     validation workflow với ≥2 người dùng đúng vai trò.
 
 ## §9. Changelog
 | Thời điểm | Đổi gì | Vì sao (trỏ về feedback/case nào) |

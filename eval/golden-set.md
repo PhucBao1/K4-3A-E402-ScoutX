@@ -1,12 +1,43 @@
 # Golden set — ScriptScout
 
 Cơ cấu theo `02-guide.md` §2.6: ≥2 case/lớp trong 4 lớp chỗ khó (8 case) + 8-10 case thường + 2-4 case hiếm.
-16/20 case dựng từ nội dung thật của `d1-slide-hackathon.pdf` và `d2-slide-hackathon.pdf` (đọc trực tiếp từ
-slide, ghi rõ trang/mục dùng để tự kiểm lại được).
+16/20 case dựng từ nội dung thật của `d1-slide-hackathon.pdf` và `d2-slide-hackathon.pdf`. Trong số đó,
+10 case có thêm căn cứ trực tiếp từ transcript thật của khoá; bảng truy xuất ở dưới giúp người chấm mở
+đúng đoạn nguồn thay vì phải tin nhãn do nhóm tự ghi.
 
-**Cách chấm mỗi case — theo 6 chiều đã định nghĩa trong `PLAN.md` mục 8:**
-Schema hợp lệ · Citation trace được (đã có `validate_output()` chặn tự động) · Không bịa số liệu ·
-Văn nói tự nhiên · Source mapping đúng nghĩa · Xử lý đúng hành vi mong đợi theo lớp chỗ khó.
+### Sáu chiều chất lượng và luật chấm pass/fail
+
+| Chiều | PASS khi | FAIL khi | Cách kiểm |
+|---|---|---|---|
+| 1. Schema hợp lệ | Có đủ `hoSo.nguon`, `hoSo.thongTin`, `kichBan.cau`; các trường bắt buộc đúng kiểu | Thiếu block/trường bắt buộc, sai kiểu, JSON không parse được | `validate_output()` và JSON parser |
+| 2. Citation traceability | Mọi `bangChung.nguonId` tồn tại trong `hoSo.nguon`; mọi ID ở `cau.nguon[]` tồn tại trong `hoSo.thongTin` | Có bất kỳ ID mồ côi hoặc trùng ID gây nhập nhằng | Layer 2-3 trong `validate_output()` |
+| 3. Factual grounding | Mọi số liệu trong `loi`/`chuTrenManHinh` có trong đúng evidence hoặc input user; trích dẫn web khớp text nguồn | Có một số liệu không căn cứ hoặc đoạn trích web không tồn tại trong source text | Layer 4/4a/4b |
+| 4. Source mapping đúng nghĩa | Citation relevance judge không trả cặp `thongTin-bangChung` không liên quan; số nguồn xác nhận không vượt số evidence độc lập còn hợp lệ | Citation có thật nhưng không chứng minh claim, hoặc khai khống mức xác minh | Layer 5 + `check_citation_relevance()` |
+| 5. Đúng chuẩn kịch bản đọc | Mọi câu có `kieu` hợp lệ, `loi` không chứa chữ số, không placeholder/rỗng; thuật ngữ Anh được giải nghĩa ở lần nhắc đầu nếu case yêu cầu | Chỉ cần một câu vi phạm một điều kiện trên | Layer 6 + checklist case; hai người chấm đối chiếu cùng điều kiện nhị phân |
+| 6. Hành vi theo case | Thỏa toàn bộ điều kiện trong cột `Kỳ vọng` của case | Vi phạm ít nhất một điều kiện bắt buộc | Đối chiếu output với checklist ghi trước khi chạy |
+
+**Quy tắc tổng hợp:** một case là `Đạt đầy đủ` khi cả sáu chiều PASS; `Đạt một phần` khi bốn chiều an
+toàn 1-4 đều PASS nhưng thiếu một yêu cầu về chuẩn kịch bản hoặc độ đầy đủ ở chiều 5-6; `Fail` khi bất kỳ
+chiều 1-4 FAIL hoặc output không hoàn thành. Cách này không cho phép lỗi bịa/citation sai được bù bằng văn
+phong tốt.
+
+### 10 case có căn cứ transcript thật
+
+| Case | Nội dung lấy làm test | Transcript gốc để kiểm lại |
+|---:|---|---|
+| 3 | Input mơ hồ về AI cần được thu hẹp thành một góc cụ thể | `transcript-04-clean.md` `[T04-003]`, `[T04-013]` |
+| 4 | Agenda rộng nhưng thời lượng chỉ một phút | `transcript-04-clean.md` `[T04-013]` |
+| 6 | Giá/token là thông tin thời điểm, không được tự bịa số giá | `transcript-06-clean.md` `[T06-154]` |
+| 8 | Quan hệ lồng nhau AI, ML, Deep Learning và Generative AI | `transcript-04-clean.md` `[T04-015]`; `transcript-06-clean.md` `[T06-027]`-`[T06-045]` |
+| 9 | Lịch sử AI, mùa đông AI, ImageNet, Transformer và ChatGPT | `transcript-04-clean.md` `[T04-022]`-`[T04-028]`; `transcript-06-clean.md` `[T06-059]` |
+| 10 | Cơ chế LLM/Transformer và attention | `transcript-04-clean.md` `[T04-038]`, `[T04-039]`, `[T04-047]` |
+| 11 | Từ mô hình ngôn ngữ tới AI Agent có tool và khả năng lập kế hoạch | `transcript-04-clean.md` `[T04-073]` |
+| 13 | Double Diamond và Human-Centered Design | `transcript-01-clean.md` `[T01-074]`, `[T01-081]` |
+| 14 | Chuyển yêu cầu mơ hồ thành problem statement rõ ràng | `transcript-05-clean.md` `[T05-143]`, `[T05-145]` |
+| 15 | HITL, cảnh báo và phê duyệt thủ công cho hành động rủi ro | `transcript-03-clean.md` `[T03-127]`, `[T03-130]`, `[T03-137]` |
+
+Các case vẫn dùng slide làm input chạy để kiểm citation/provenance. Bảng trên chứng minh nội dung và kỳ
+vọng của ít nhất 10 case xuất phát từ transcript thật, không phải nhóm tự nghĩ ra sau khi thấy output.
 
 **Quality bar dự kiến (điền chính thức vào `spec.md` §7 sau khi chạy xong):** Đạt khi ≥ 70% qua bộ VÀ
 100% case lớp ① không chứa số liệu/ví dụ bịa (đây là điều kiện cứng, không thương lượng).

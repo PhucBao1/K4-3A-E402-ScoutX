@@ -616,7 +616,7 @@ def _run_format_check(video_path: str) -> dict:
 
 @app.post("/format-check")
 async def format_check_endpoint(file: UploadFile = File(...)):
-    """Feature A — Video Format Compliance Checker (BA.md mục 5, CHƯA build trước hôm nay).
+    """Feature A — Video Format Compliance Checker, prototype bonus ngoài lát cắt C3 chính.
     Thuần rule-based + OCR (format_qa.py) — KHÔNG gọi AI cho bước so sánh, đúng chuẩn khung-hinh.md
     của BTC (1920x1080/30fps/chữ tối đa 40 ký tự/vùng an toàn)."""
     video_bytes = await file.read()
