@@ -91,31 +91,47 @@ def _ocr_lines(frame_path: str) -> list[dict]:
             Image.open(frame_path), lang="eng", output_type=pytesseract.Output.DICT,
         )
 
-    lines: dict[tuple, dict] = {}
+    # Gộp thô theo (block,par,line) của tesseract trước — nhưng tesseract hay gộp NHẦM nhiều
+    # nhãn/ô riêng biệt (vd 4 ô trong 1 sơ đồ) thành "1 dòng" nếu chúng nằm gần nhau theo chiều
+    # dọc, dù cách xa nhau theo chiều ngang. Tách LẠI bằng khoảng cách thật giữa các từ (dữ liệu
+    # mức-từng-từ tesseract đã có sẵn): nếu khoảng trống giữa 2 từ liền kề lớn hơn hẳn chiều cao
+    # chữ (dấu hiệu "2 ô/nhãn khác nhau" chứ không phải khoảng cách giữa 2 từ bình thường trong
+    # cùng 1 câu), cắt thành 2 dòng riêng.
+    GAP_RATIO = 2.0
+    raw_groups: dict[tuple, list[dict]] = {}
     n = len(data["text"])
     for i in range(n):
         word = data["text"][i].strip()
         if not word:
             continue
         key = (data["block_num"][i], data["par_num"][i], data["line_num"][i])
-        l, t, w, h = data["left"][i], data["top"][i], data["width"][i], data["height"][i]
-        if key not in lines:
-            lines[key] = {"words": [word], "left": l, "top": t, "right": l + w, "bottom": t + h}
-        else:
-            ln = lines[key]
-            ln["words"].append(word)
-            ln["left"] = min(ln["left"], l)
-            ln["top"] = min(ln["top"], t)
-            ln["right"] = max(ln["right"], l + w)
-            ln["bottom"] = max(ln["bottom"], t + h)
-    return [
-        {
-            "text": " ".join(ln["words"]),
-            "left": ln["left"], "top": ln["top"],
-            "right": ln["right"], "bottom": ln["bottom"],
-        }
-        for ln in lines.values()
-    ]
+        raw_groups.setdefault(key, []).append({
+            "word": word, "left": data["left"][i], "top": data["top"][i],
+            "width": data["width"][i], "height": data["height"][i],
+        })
+
+    result = []
+    for words in raw_groups.values():
+        words.sort(key=lambda w: w["left"])
+        sub_lines = [[words[0]]]
+        for w in words[1:]:
+            prev = sub_lines[-1][-1]
+            gap = w["left"] - (prev["left"] + prev["width"])
+            avg_h = (prev["height"] + w["height"]) / 2
+            if avg_h > 0 and gap > GAP_RATIO * avg_h:
+                sub_lines.append([w])
+            else:
+                sub_lines[-1].append(w)
+
+        for sub in sub_lines:
+            result.append({
+                "text": " ".join(w["word"] for w in sub),
+                "left": min(w["left"] for w in sub),
+                "top": min(w["top"] for w in sub),
+                "right": max(w["left"] + w["width"] for w in sub),
+                "bottom": max(w["top"] + w["height"] for w in sub),
+            })
+    return result
 
 
 def check_frame(frame_path: str, time_sec: float) -> list[dict]:
