@@ -295,6 +295,21 @@
       <p style="font-size:0.85em;color:#666;">Video dựng từ TTS thật, khung hình tĩnh — không phải animation. Xem <code>codebase/backend/README.md</code> để biết giới hạn.</p>
     </div>
 
+    <div class="export-row" style="margin-top:10px; align-items:center; flex-wrap:wrap;">
+      <span style="font-size:0.85em; color:#666;">🧪 Thử nghiệm — dựng video HyperFrames (animation thật):</span>
+      <select id="hfEngineSelect" style="padding:6px 8px; border-radius:6px; border:1px solid #ccc;">
+        <option value="openai">OpenAI (nhanh, không tốn usage Claude)</option>
+        <option value="claude-code">Claude Code (chất lượng cao hơn, CHẬM + tốn usage Pro cá nhân)</option>
+      </select>
+      <button class="secondary" id="renderHfVideoBtn" disabled>🎞️ Dựng video HyperFrames</button>
+    </div>
+    <p id="hfEngineWarning" style="display:none; font-size:0.8em; color:#b45309; margin:4px 0 0;">
+      ⚠️ Chế độ "Claude Code" dùng chung tài khoản Claude Pro cá nhân của người vận hành server — mỗi cảnh có thể tốn ~$0,66 và 1-4 phút, ảnh hưởng usage cá nhân. Chỉ bật khi thật sự cần chất lượng cao nhất.
+    </p>
+    <div id="hfVideoArea" style="display:none; margin-top:10px;">
+      <video id="hfVideoPlayer" controls style="max-width:100%; border-radius:6px;"></video>
+    </div>
+
     <div id="qaContentSection" style="display:none; margin-top:16px; border-top:1px solid #ddd; padding-top:12px;">
       <h3 style="margin-top:0;">🔍 QA nội dung: video có đọc lệch kịch bản không? (Feature B — thử nghiệm, xem BA.md)</h3>
       <p style="font-size:0.9em;color:#666;">Đúng quy trình lab coach mô tả: nghe video → chuyển thành văn bản → đối chiếu với kịch bản. AI làm cả 3 bước.</p>
@@ -476,6 +491,11 @@ const clickHint = document.getElementById('clickHint');
 const exportScriptBtn = document.getElementById('exportScriptBtn');
 const exportSourcesBtn = document.getElementById('exportSourcesBtn');
 const renderVideoBtn = document.getElementById('renderVideoBtn');
+const renderHfVideoBtn = document.getElementById('renderHfVideoBtn');
+const hfEngineSelect = document.getElementById('hfEngineSelect');
+const hfEngineWarning = document.getElementById('hfEngineWarning');
+const hfVideoArea = document.getElementById('hfVideoArea');
+const hfVideoPlayer = document.getElementById('hfVideoPlayer');
 const expandScriptBtn = document.getElementById('expandScriptBtn');
 const videoArea = document.getElementById('videoArea');
 const videoPlayer = document.getElementById('videoPlayer');
@@ -710,6 +730,7 @@ runBtn.addEventListener('click', async () => {
     exportScriptBtn.disabled = false;
     exportSourcesBtn.disabled = false;
     renderVideoBtn.disabled = false;
+    renderHfVideoBtn.disabled = false;
     expandScriptBtn.disabled = false;
 
     // Mặc định tự làm phong phú kịch bản ngay sau khi generate xong — trước đây phải bấm tay
@@ -822,6 +843,54 @@ renderVideoBtn.addEventListener('click', async () => {
     renderVideoBtn.disabled = false;
   expandScriptBtn.disabled = false;
     renderVideoBtn.textContent = originalText;
+  }
+});
+
+// Hiện cảnh báo usage khi người dùng chọn "claude-code", ẩn khi chọn "openai" (mặc định).
+hfEngineSelect.addEventListener('change', () => {
+  hfEngineWarning.style.display = hfEngineSelect.value === 'claude-code' ? 'block' : 'none';
+});
+
+renderHfVideoBtn.addEventListener('click', async () => {
+  if (!AppState.kichBanJson) return;
+  const engine = hfEngineSelect.value;
+  if (engine === 'claude-code' && !confirm(
+    'Chế độ "Claude Code" dùng usage Pro cá nhân thật (ước tính ~$0,66 + 1-4 phút MỖI CÂU trong kịch bản). Tiếp tục?'
+  )) {
+    return;
+  }
+  errorBox.style.display = 'none';
+  hfVideoArea.style.display = 'none';
+  renderHfVideoBtn.disabled = true;
+  renderVideoBtn.disabled = true;
+  const originalText = renderHfVideoBtn.textContent;
+  const stopBtnTimer = startElapsedButtonTimer(
+    renderHfVideoBtn,
+    engine === 'claude-code'
+      ? '🎞️ Đang dựng (Claude Code, có thể mất nhiều phút/câu)…'
+      : '🎞️ Đang dựng video HyperFrames…'
+  );
+
+  const formData = new FormData();
+  formData.append('kich_ban_json', JSON.stringify(AppState.kichBanJson));
+  formData.append('engine', engine);
+
+  try {
+    const res = await fetch('/render-video-hyperframes', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Lỗi HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    hfVideoPlayer.src = URL.createObjectURL(blob);
+    hfVideoArea.style.display = 'block';
+  } catch (err) {
+    showError(err.message || 'Không dựng được video HyperFrames, vui lòng thử lại.');
+  } finally {
+    stopBtnTimer();
+    renderHfVideoBtn.disabled = false;
+    renderVideoBtn.disabled = false;
+    renderHfVideoBtn.textContent = originalText;
   }
 });
 
@@ -943,6 +1012,7 @@ demoBtn.addEventListener('click', () => {
   exportScriptBtn.disabled = false;
   exportSourcesBtn.disabled = false;
   renderVideoBtn.disabled = false;
+  renderHfVideoBtn.disabled = false;
   expandScriptBtn.disabled = false;
 });
 </script>

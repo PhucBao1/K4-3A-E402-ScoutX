@@ -15,6 +15,7 @@ from openai import OpenAI
 
 from format_qa import check_video_format
 from render_video import render as render_video_to_mp4
+from render_video_hyperframes import render as render_video_hyperframes_to_mp4
 
 from prompt import (
     EXPAND_SCRIPT_PROMPT,
@@ -908,6 +909,35 @@ async def render_video_endpoint(kich_ban_json: str = Form(...)):
         os.remove(out_path)
         raise HTTPException(status_code=502, detail=f"Dựng video lỗi: {e}")
     return FileResponse(out_path, media_type="video/mp4", filename="scriptscout-video.mp4")
+
+
+@app.post("/render-video-hyperframes")
+async def render_video_hyperframes_endpoint(
+    kich_ban_json: str = Form(...),
+    engine: str = Form("openai"),
+):
+    """Nhánh thử nghiệm NÂNG CAO riêng (render_video_hyperframes.py) — tách biệt hoàn toàn khỏi
+    /render-video ở trên, không ảnh hưởng luồng chính đang chạy ổn định.
+
+    "engine" cho người dùng CHỌN THẬT trên UI, không tự động bật ngầm:
+    - "openai" (mặc định): dùng API OpenAI thường (generate_ai_scene + vòng tự-sửa 2 tầng + AI
+      chấm chất lượng) — nhanh hơn, không tốn usage Pro cá nhân.
+    - "claude-code": bật thêm tầng 0 (Claude Code headless, agent code thật) — chất lượng cao hơn
+      hẳn nhưng CHẬM hơn nhiều (~1-4 phút/cảnh) và tốn usage Pro CÁ NHÂN thật (đo thật ~$0,66/cảnh)
+      — CHỈ nên bật khi người dùng chủ động muốn 1 video chất lượng cao, không dùng cho test/demo
+      thường xuyên."""
+    kich_ban = json.loads(kich_ban_json)
+    if not kich_ban.get("cau"):
+        raise HTTPException(status_code=400, detail="Kịch bản trống, không có gì để dựng video")
+    use_claude_code = engine == "claude-code"
+    fd, out_path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    try:
+        render_video_hyperframes_to_mp4(kich_ban, out_path, use_claude_code=use_claude_code)
+    except Exception as e:
+        os.remove(out_path)
+        raise HTTPException(status_code=502, detail=f"Dựng video (HyperFrames) lỗi: {e}")
+    return FileResponse(out_path, media_type="video/mp4", filename="scriptscout-video-hyperframes.mp4")
 
 
 @app.post("/expand-script")

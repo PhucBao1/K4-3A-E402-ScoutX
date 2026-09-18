@@ -508,7 +508,7 @@ xong hoặc hết lượt thử."""
     return check_scene(project_dir).get("ok", False)
 
 
-def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
+def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str, use_claude_code: bool = False) -> str:
     """Xử lý ĐÚNG 1 câu — tách riêng khỏi render() để chạy song song được. Mỗi lời gọi hàm này
     PHẢI nhận 1 project_dir RIÊNG (không dùng chung giữa các luồng cùng lúc), vì mỗi lần ghi đè
     index.html của chính project đó rồi mới render — 2 luồng dùng chung 1 project sẽ ghi đè lẫn
@@ -526,12 +526,13 @@ def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
     index_path = os.path.join(project_dir, "index.html")
     used_ai_scene = False
 
-    # Tầng 0 — AGENT CODE THẬT (Claude Code headless), thử TRƯỚC hết: chất lượng cao hơn hẳn
-    # đường API bên dưới (test thật: pass sạch ngay lần đầu, 47/47 WCAG AA). Claude Code tự viết
-    # NGUYÊN file index.html (không qua build_ai_scene_html/khung chrome cố định — nó tự thiết kế
-    # cả phần thương hiệu theo đúng skill), nên khi tầng này thành công thì BỎ QUA toàn bộ vòng
-    # tự-sửa API bên dưới. Rớt về tầng API nếu claude CLI không có/lỗi/timeout.
-    if generate_scene_via_claude_code(cau, duration, project_dir):
+    # Tầng 0 — AGENT CODE THẬT (Claude Code headless), CHỈ chạy nếu use_claude_code=True (người
+    # dùng chủ động bật, mặc định tắt vì tốn usage Pro cá nhân thật — xem docstring render()).
+    # Chất lượng cao hơn hẳn đường API bên dưới (test thật: pass sạch ngay lần đầu, 47/47 WCAG AA).
+    # Claude Code tự viết NGUYÊN file index.html (không qua build_ai_scene_html/khung chrome cố
+    # định — nó tự thiết kế cả phần thương hiệu theo đúng skill), nên khi tầng này thành công thì
+    # BỎ QUA toàn bộ vòng tự-sửa API bên dưới. Rớt về tầng API nếu claude CLI không có/lỗi/timeout.
+    if use_claude_code and generate_scene_via_claude_code(cau, duration, project_dir):
         used_ai_scene = True
 
     # Vòng tự-sửa 2 tầng qua API (chỉ chạy nếu tầng 0 ở trên thất bại/không có claude CLI):
@@ -632,15 +633,21 @@ def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
     return segment_path
 
 
-def render(kich_ban: dict, out_mp4: str, max_workers: int = 3) -> None:
+def render(kich_ban: dict, out_mp4: str, max_workers: int = 3, use_claude_code: bool = False) -> None:
     """Chạy SONG SONG nhiều câu cùng lúc thay vì tuần tự từng câu — mỗi câu độc lập hoàn toàn
     (TTS + thiết kế cảnh + render riêng), chỉ cần ghép nối đúng THỨ TỰ ở bước cuối.
 
-    Mặc định GIẢM xuống 3 luồng (trước là 6) kể từ khi thêm tầng 0 — Claude Code headless
-    (generate_scene_via_claude_code): mỗi lượt gọi nặng hơn nhiều so với 1 API call thường (agent
-    tự lặp nhiều bước, có thể mất 1-4 phút/cảnh), và dùng CHUNG 1 tài khoản Pro cá nhân qua CLI
-    `claude` — chạy quá nhiều luồng cùng lúc dễ chạm giới hạn dùng của gói cá nhân. Tăng lại nếu
-    đã có Anthropic API key riêng cho việc này, giảm nếu thấy bị rate-limit/timeout nhiều."""
+    use_claude_code: MẶC ĐỊNH TẮT (False) — bật "tầng 0" agent code thật (Claude Code headless,
+    generate_scene_via_claude_code) cho chất lượng cao hơn hẳn, nhưng tốn usage Pro CÁ NHÂN thật
+    (đo thật: ~$0.66/cảnh, ~110 giây/cảnh, 12 lượt agent tự lặp) và dùng CHUNG quota với phiên làm
+    việc đang chạy — để mặc định TẮT tránh tốn usage ngầm mỗi lần render/test, chỉ bật khi người
+    dùng chủ động chọn (UI có toggle riêng cho việc này). Khi tắt, dùng đường API thường (OpenAI,
+    generate_ai_scene + vòng tự-sửa 2 tầng + AI chấm chất lượng) — vẫn tốt, chỉ chậm/tốn usage hơn
+    khi có Claude Code làm tầng đầu.
+
+    max_workers mặc định giảm xuống 3 (trước 6) vì lý do tương tự khi use_claude_code=True: mỗi
+    lượt agent nặng hơn nhiều 1 API call thường (có thể mất 1-4 phút/cảnh) — chạy quá nhiều luồng
+    cùng lúc dễ chạm giới hạn dùng gói cá nhân. Không ảnh hưởng khi use_claude_code=False."""
     cau_list = kich_ban.get("cau", [])
     n_workers = min(max_workers, len(cau_list)) or 1
     with tempfile.TemporaryDirectory() as tmp:
@@ -655,7 +662,7 @@ def render(kich_ban: dict, out_mp4: str, max_workers: int = 3) -> None:
         def _worker(i: int, cau: dict) -> tuple[int, str]:
             project_dir = dir_pool.get()
             try:
-                return i, _process_one_scene(i, cau, tmp, project_dir)
+                return i, _process_one_scene(i, cau, tmp, project_dir, use_claude_code)
             finally:
                 dir_pool.put(project_dir)
 
