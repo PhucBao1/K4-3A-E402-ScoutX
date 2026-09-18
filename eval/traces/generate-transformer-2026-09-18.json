@@ -1,0 +1,92 @@
+{
+  "traceVersion": "1.0",
+  "timestamp": "2026-09-18T14:51:22+07:00",
+  "status": "success",
+  "execution": {
+    "endpoint": "/generate",
+    "method": "direct endpoint function call",
+    "codePath": "codebase/backend/main.py:generate",
+    "elapsedSeconds": 21.385,
+    "httpStatusEquivalent": 200,
+    "slideProvided": false
+  },
+  "ai": {
+    "provider": "OpenAI",
+    "models": [
+      "gpt-4o-mini"
+    ],
+    "tools": [
+      "web_search_preview"
+    ],
+    "apiKeyRedacted": true
+  },
+  "input": {
+    "topic": "Cơ chế hoạt động của Transformer",
+    "goal": "Giải thích cơ chế self-attention và vì sao Transformer xử lý ngữ cảnh hiệu quả",
+    "audience": "Sinh viên năm nhất mới học về AI",
+    "durationMinutes": 3
+  },
+  "pipeline": [
+    {
+      "step": "scope_check",
+      "usesAI": true,
+      "result": "in_scope"
+    },
+    {
+      "step": "web_search",
+      "usesAI": true,
+      "result": "3 sources returned"
+    },
+    {
+      "step": "script_generation",
+      "usesAI": true,
+      "result": "source dossier and script returned"
+    },
+    {
+      "step": "validation",
+      "usesAI": true,
+      "result": "passed backend validation"
+    }
+  ],
+  "output": {
+    "summary": {
+      "sourceCount": 3,
+      "informationCount": 3,
+      "sentenceCount": 3,
+      "verifiedInformationCount": 0,
+      "unverifiedInformationCount": 3
+    },
+    "sample": {
+      "source": {
+        "id": "source1",
+        "title": "Attention Is All You Need",
+        "organization": "Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Lukasz Kaiser, Illia Polosukhin",
+        "published": "2017",
+        "url": "https://arxiv.org/abs/1706.03762",
+        "trust": "cao"
+      },
+      "information": {
+        "id": "info1",
+        "claim": "Cơ chế self-attention là trái tim của Transformer và giúp tối ưu hóa việc xử lý thông tin trong các chuỗi đầu vào.",
+        "sourceId": "source1",
+        "quote": "We introduce a novel architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.",
+        "verificationStatus": "chua-xac-minh"
+      },
+      "scriptSentence": {
+        "number": 3,
+        "speech": "Với self-attention, Transformer có thể vừa linh hoạt vừa hiệu quả trong việc thu thập thông tin từ nhiều khía cạnh khác nhau.",
+        "informationIds": [
+          "info1",
+          "info2",
+          "info3"
+        ]
+      }
+    }
+  },
+  "observations": [
+    "Luồng không có slide đã tự tìm được ba nguồn web và tạo hồ sơ nguồn.",
+    "Cả ba thông tin được đánh dấu chua-xac-minh vì mỗi thông tin chỉ có một nguồn.",
+    "Backend chấp nhận response ngay trong lần chạy được ghi nhận; retry count không được instrument nên không suy đoán giá trị.",
+    "Trace chỉ giữ metadata và mẫu output cần cho phúc khảo, không lưu API key hoặc chain-of-thought."
+  ]
+}
