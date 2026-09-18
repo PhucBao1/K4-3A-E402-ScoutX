@@ -64,6 +64,64 @@
 - **Thời gian tốn kém:** Mỗi video 3-5 phút (35-50 câu) tiêu tốn **5 giờ viết** + **3 giờ duyệt** = **8 giờ/video**.
 - **Điểm nghẽn:** Người viết phải tự tra cứu thuật ngữ ngoài mạng để sửa kịch bản; khâu kiểm duyệt phải dùng 2 AI (Claude + Codex) chấm chéo nhưng vẫn phải duyệt tay cuối cùng.
 
+### 1b. Mining bổ sung từ tài liệu C3 do BTC cấp
+
+> Mục tiêu: bổ sung evidence chuẩn B cho Track C, vì nhóm mới phỏng vấn được 2 Lab Coach/Studio team, chưa đủ ngưỡng phỏng vấn riêng của Track C là ≥3 người. Mining này dùng tài liệu thật/fixture chính thức của BTC trong `K4-3A-Day05-06-AI-Product-Hackathon/data/studio-pack/c3-scriptscout/`, không commit dữ liệu gốc vào repo nộp bài.
+
+**Nguồn mining & cách đếm kiểm lại được**
+
+1. Đọc `data/studio-pack/c3-scriptscout/README.md` để lấy pain gốc, sản phẩm tối thiểu và các tình huống khó của đề C3.
+2. Đếm bằng script Python trên 3 file fixture chính thức:
+   - `vi-du/kich-ban-d1.md`
+   - `vi-du/ho-so-nguon-mau.json`
+   - `vi-du/kich-ban-co-nguon.json`
+3. Command kiểm lại:
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+import json, re
+base = Path("data/studio-pack/c3-scriptscout")
+script_md = (base / "vi-du/kich-ban-d1.md").read_text()
+print("script_sentences_md", len(re.findall(r"^### Câu ", script_md, re.M)))
+print("stops_md", len(re.findall(r"^- \\*\\*Dừng:", script_md, re.M)))
+source = json.loads((base / "vi-du/ho-so-nguon-mau.json").read_text())
+print("sources", len(source["nguon"]))
+print("thongTin", len(source["thongTin"]))
+print("removed_sources", sum(1 for s in source["nguon"] if s.get("trangThai") == "bi-loai"))
+print("low_trust", sum(1 for s in source["nguon"] if s.get("doTinCay") == "thap"))
+print("warning_sources", sum(1 for s in source["nguon"] if s.get("canhBao")))
+print("unverified_info", sum(1 for t in source["thongTin"] if t.get("trangThai") == "chua-xac-minh"))
+linked = json.loads((base / "vi-du/kich-ban-co-nguon.json").read_text())
+print("linked_sentences", len(linked.get("cau", [])))
+print("linked_with_sources", sum(1 for c in linked.get("cau", []) if c.get("nguon")))
+print("total_source_refs", sum(len(c.get("nguon") or []) for c in linked.get("cau", [])))
+PY
+```
+
+**Kết quả đếm**
+
+| Quan sát mining | Kết quả | Ý nghĩa với ScriptScout |
+|---|---:|---|
+| Kịch bản mẫu đã phát hành thật | 40 câu + 1 khoảng dừng | Sản phẩm cần ra kịch bản đọc thành lời theo từng cảnh, không phải báo cáo văn bản ngắn |
+| Hồ sơ nguồn mẫu | 5 nguồn, 6 thông tin | Người duyệt cần một hồ sơ nguồn riêng, không chỉ danh sách link cuối bài |
+| Nguồn bị loại trong hồ sơ mẫu | 1/5 nguồn | Workflow duyệt nguồn/loại nguồn là nhu cầu thật trong thiết kế đề |
+| Nguồn độ tin cậy thấp | 1/5 nguồn | Không phải nguồn nào tìm được cũng đáng tin |
+| Nguồn có cảnh báo lỗi thời | 1/5 nguồn | Chủ đề AI thay đổi nhanh, cần cảnh báo nguồn cũ |
+| Thông tin chưa xác minh | 1/6 thông tin | Có thông tin chỉ có 1 nguồn, phải đánh dấu chưa xác minh thay vì nói chắc |
+| Câu mẫu đã nối nguồn | 7/7 câu trong `kich-ban-co-nguon.json` có `nguon` | Tiêu chí "bấm vào câu thấy chứng minh" là thao tác chấm thật của C3 |
+
+**Ví dụ nguyên văn từ tài liệu BTC**
+
+1. *"Hiện nay người biên soạn phải tự đọc tài liệu, tự tra cứu trên mạng rồi tự viết."* — `data/studio-pack/c3-scriptscout/README.md`
+2. *"khi đưa cho người khác duyệt thì không ai kiểm được câu nào lấy từ đâu, vì danh sách nguồn chỉ được liệt kê ở cuối tài liệu."* — `data/studio-pack/c3-scriptscout/README.md`
+3. *"Thiếu tư liệu thì người viết dễ đưa vào những con số hoặc ví dụ không có thật."* — `data/studio-pack/c3-scriptscout/README.md`
+4. *"Riêng chủ đề AI còn thay đổi từng tháng, nên một thông tin đúng lúc viết có thể đã cũ khi video lên sóng."* — `data/studio-pack/c3-scriptscout/README.md`
+5. *"Số liệu quan trọng cần ít nhất hai nguồn độc lập xác nhận, nếu không thì phải đánh dấu là chưa kiểm chứng."* — `data/studio-pack/c3-scriptscout/README.md`
+6. *"Mỗi câu có thể là khoảng lặng"* và *"Không có chữ số."* — `data/studio-pack/c3-scriptscout/mau-kich-ban.md`, cho thấy output cần đúng luật kịch bản đọc thành tiếng, không chỉ đúng nội dung.
+
+**Kết luận mining:** tài liệu/fixture chính thức của BTC xác nhận đúng pain nhóm chọn: người viết cần kịch bản có nguồn truy từng câu, người duyệt cần xem/loại nguồn, và hệ thống phải xử lý nguồn cũ, nguồn kém tin cậy, thông tin chưa xác minh. Phần phỏng vấn n=2 cho số đo thời gian thật; phần mining này bổ sung bằng chứng kiểm lại được từ tài liệu/fixture C3.
+
 ### 2. Danh sách Trích dẫn nguyên văn (Verbatim Quotes cho `spec.md` §1)
 1. *"Thời gian viết đến lúc duyệt — viết 5h (nhưng tầm 2.5h dựng chính) + duyệt 3h."* — (Lab Coach Hải DM)
 2. *"Video 3-5p cần từ 35-50 câu kịch bản."* — (Lab Coach Hải DM)

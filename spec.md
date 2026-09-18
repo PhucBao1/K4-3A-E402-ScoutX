@@ -13,14 +13,17 @@ Loại: [ ] Tối ưu tính năng có sẵn  [x] Tính năng mới
 - Core JTBD (không tên sản phẩm/AI trong câu): Khi nhận một chủ đề mới cần lên video bài giảng, người viết kịch bản cần tổng hợp tài liệu thành kịch bản có thể kiểm chứng từng câu, để người duyệt tin được và không đưa thông tin sai vào video.
 - Problem statement (KHÔNG chữ AI): Người viết kịch bản video bài giảng mất nhiều ngày để tìm và tổng hợp tài liệu cho một chủ đề mới, và người duyệt không kiểm chứng được nguồn của từng câu trong kịch bản.
 - Evidence (chuẩn A và/hoặc B — log đầy đủ trong repo):
-  - Số liệu mining / kết quả khảo sát (n = ?, % xác nhận): **Đã phỏng vấn thật n = 2** (2 Lab Coach kiêm thành viên Studio Team sản xuất bài giảng của khoá học AI Thực Chiến — phỏng vấn tối 16/9/2026, log chi tiết nguyên văn trong `eval/interview-guide.md`). 100% (2/2) xác nhận thời gian viết và kiểm duyệt kịch bản chiếm phần lớn thời gian sản xuất video (~8h cho 1 video 3-5 phút gồm 5h viết + 3h duyệt), và khâu tra cứu thuật ngữ/kiểm chứng nguồn hiện tại làm thủ công tốn nhiều công sức.
-  - ≥5 quote/ví dụ nguyên văn + nguồn (trích từ `eval/interview-guide.md`):
+  - Phỏng vấn thật: **n = 2** Lab Coach kiêm thành viên Studio Team sản xuất bài giảng của khoá học AI Thực Chiến — phỏng vấn tối 16/9/2026, log chi tiết nguyên văn trong `eval/interview-guide.md`. 100% (2/2) xác nhận thời gian viết và kiểm duyệt kịch bản chiếm phần lớn thời gian sản xuất video (~8h cho 1 video 3-5 phút gồm 5h viết + 3h duyệt), và khâu tra cứu thuật ngữ/kiểm chứng nguồn hiện tại làm thủ công tốn nhiều công sức.
+  - Mining bổ sung chuẩn B từ tài liệu/fixture chính thức C3 của BTC (`data/studio-pack/c3-scriptscout/`, cách đếm và command kiểm lại ghi trong `eval/interview-guide.md`): kịch bản mẫu thật có **40 câu + 1 khoảng dừng**; hồ sơ nguồn mẫu có **5 nguồn, 6 thông tin**, trong đó **1 nguồn bị loại**, **1 nguồn độ tin cậy thấp**, **1 nguồn có cảnh báo lỗi thời**, **1/6 thông tin chưa xác minh**; file `kich-ban-co-nguon.json` có **7/7 câu mẫu gắn nguồn** để bấm về đoạn chứng minh. Kết luận mining: bài toán "mỗi câu truy được về nguồn" và "người duyệt kiểm soát nguồn" không phải giả định của nhóm, mà nằm trực tiếp trong fixture chấm của đề C3.
+  - ≥5 quote/ví dụ nguyên văn + nguồn (trích từ phỏng vấn và mining trong `eval/interview-guide.md`):
     1. *"Thời gian viết đến lúc duyệt — viết 5h (nhưng tầm 2.5h dựng chính) + duyệt 3h."* — (Lab Coach kiêm Studio Team)
     2. *"Video 3-5p: 35-50 câu."* — (Lab Coach kiêm Studio Team)
     3. *"Có dùng AI nhưng phải tự tìm kiếm thuật ngữ bên ngoài rồi chỉnh lại kịch bản."* — (Lab Coach kiêm Studio Team)
     4. *"Review lại kịch bản: Claude tạo kịch bản + Codex review lại kịch bản chấm chéo."* — (Lab Coach Thành Phạm kiêm Studio Team)
     5. *"Quy trình hiện tại là làm hết từ đầu đến cuối mới feedback."* — (Lab Coach Thành Phạm kiêm Studio Team)
     6. *"Đoạn QA QC con người feedback + AI tự nghe và xử lý khi lỗi... cần luồng QA tự động hoá."* — (Lab Coach Thành Phạm kiêm Studio Team)
+    7. *"khi đưa cho người khác duyệt thì không ai kiểm được câu nào lấy từ đâu, vì danh sách nguồn chỉ được liệt kê ở cuối tài liệu."* — tài liệu C3 do BTC cấp
+    8. *"Số liệu quan trọng cần ít nhất hai nguồn độc lập xác nhận, nếu không thì phải đánh dấu là chưa kiểm chứng."* — tài liệu C3 do BTC cấp
 
 ## §2. Impact & quyết định chọn
 - Bảng impact ≥3 ứng viên (bao nhiêu người · tần suất · tốn gì mỗi lần · khả thi) — **3 pain point thật trong cùng phạm vi ScriptScout** (dữ liệu định lượng trích xuất từ phỏng vấn 2 Lab Coach kiêm Studio team trong `eval/interview-guide.md`):
