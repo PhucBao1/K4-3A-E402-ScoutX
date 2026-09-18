@@ -22,6 +22,7 @@ import html
 import json
 import os
 import queue
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,10 @@ from prompt import HYPERFRAMES_FIX_PROMPT, HYPERFRAMES_QUALITY_JUDGE_PROMPT, HYP
 _HOME = os.path.expanduser("~")
 _DEFAULT_NODE_BIN = os.path.join(_HOME, ".local/hyperframes-tools/node/bin")
 _DEFAULT_HF_BIN = os.path.join(_HOME, ".local/hyperframes-tools/npm-global/bin")
+# Repo root (2 cấp trên file này: codebase/backend/render_video_hyperframes.py) — cwd khi gọi
+# `claude` headless để nó tự tìm thấy .claude/skills/scriptscout-authoring của repo.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_CLAUDE_CODE_BIN = shutil.which("claude") or os.path.join(_HOME, ".local/bin/claude")
 
 # Mặc định trỏ vào chỗ đã cài cố định ở trên — override bằng biến môi trường nếu máy khác.
 NODE_BIN_DIR = os.environ.get("HF_NODE_BIN_DIR") or (
@@ -446,6 +451,63 @@ def init_project(project_dir: str) -> None:
     )
 
 
+def generate_scene_via_claude_code(cau: dict, duration: float, project_dir: str) -> bool:
+    """Dùng AGENT CODE THẬT (Claude Code headless, lệnh `claude -p`) để thiết kế 1 cảnh — khác hẳn
+    generate_ai_scene() (1 lượt gọi API hoàn thiện, không tự kiểm/tự sửa được gì ngoài JSON trả
+    về). Claude Code tự ĐỌC/GHI file, tự CHẠY `hyperframes check`, tự đọc lỗi thật và sửa lặp lại
+    — đúng cách 1 người lập trình thật làm (và đúng cách suy đoán cảnh mẫu chất lượng cao của
+    teammate DungBallad được tạo ra). Test trực tiếp: pass sạch ngay lần thử đầu, 47/47 WCAG AA,
+    chất lượng vượt hẳn generate_ai_scene() (xem golden-set.md).
+
+    CẢNH BÁO GIỚI HẠN THẬT (không né): `claude` CLI ở đây đăng nhập bằng tài khoản Pro CÁ NHÂN
+    (claude.ai OAuth), không phải Anthropic API key tính phí theo lượt — dùng để tự làm video demo
+    thì ổn, nhưng KHÔNG phù hợp cho sản phẩm thật phục vụ nhiều người dùng đồng thời (vượt giới hạn
+    dùng của gói cá nhân, sai mục đích gói Pro). Mỗi lượt gọi cũng CHẬM hơn nhiều so với 1 API call
+    (agent tự lặp nhiều bước) — cân nhắc giảm max_workers khi bật đường này để tránh quá tải.
+
+    Trả False nếu `claude` CLI không có/lỗi/timeout — nơi gọi tự rớt về generate_ai_scene() (đường
+    API cũ) làm phương án dự phòng, không làm hỏng cả pipeline."""
+    if not _CLAUDE_CODE_BIN or not os.path.exists(_CLAUDE_CODE_BIN):
+        return False
+
+    task = f"""Dùng skill scriptscout-authoring (đọc kỹ references/theme-guidelines.md để lấy đúng bảng màu VinUni Academic Light, cấm emoji) để thiết kế 1 cảnh HyperFrames hoàn chỉnh.
+
+Câu kịch bản cần minh hoạ:
+- Tiêu đề: "{cau.get('chuTrenManHinh') or cau.get('loi', '')[:40]}"
+- Lời đọc: "{cau.get('loi', '')}"
+- Ý đồ hình ảnh: {cau.get('yDoHinh', '')}
+- Thời lượng: {round(duration, 2)} giây
+
+Viết 1 file HTML composition HyperFrames HOÀN CHỈNH (có div id=root với data-composition-id/
+data-start="0"/data-duration="{round(duration, 2)}"/data-width="1920"/data-height="1080", timeline
+GSAP paused tên tl, window.__timelines['main']=tl, canvas 1920x1080, PHẢI có nguyên văn tiêu đề và
+lời đọc ở đâu đó trên màn hình) tại đường dẫn tuyệt đối {project_dir}/index.html.
+
+Sau đó chạy lệnh "{_bin_path('hyperframes')} check {project_dir}" để kiểm tra thật, đọc lỗi và tự
+sửa file tới khi lệnh đó pass (exit code 0), tối đa 5 lần thử. Không hỏi lại tôi, tự làm tới khi
+xong hoặc hết lượt thử."""
+
+    try:
+        subprocess.run(
+            [_CLAUDE_CODE_BIN, "-p", task,
+             "--allowedTools", "Read,Write,Edit,Bash",
+             "--permission-mode", "acceptEdits",
+             "--max-turns", "30",
+             "--output-format", "text"],
+            cwd=_REPO_ROOT, env=_run_env(), capture_output=True, timeout=240, text=True,
+        )
+    except subprocess.TimeoutExpired:
+        print("[HyperFrames AI] Claude Code headless timeout, rớt về đường API thường.")
+        return False
+    except Exception as e:
+        print(f"[HyperFrames AI] Claude Code headless lỗi ({e}), rớt về đường API thường.")
+        return False
+
+    if not os.path.exists(os.path.join(project_dir, "index.html")):
+        return False
+    return check_scene(project_dir).get("ok", False)
+
+
 def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
     """Xử lý ĐÚNG 1 câu — tách riêng khỏi render() để chạy song song được. Mỗi lời gọi hàm này
     PHẢI nhận 1 project_dir RIÊNG (không dùng chung giữa các luồng cùng lúc), vì mỗi lần ghi đè
@@ -461,15 +523,24 @@ def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
         duration = float(cau.get("dungGiay", SILENCE_DEFAULT_SEC))
         make_silence(audio_path, duration)
 
-    # Vòng tự-sửa 2 tầng (nhanh + giữ được thiết kế đẹp thay vì bỏ đi sinh lại từ đầu):
+    index_path = os.path.join(project_dir, "index.html")
+    used_ai_scene = False
+
+    # Tầng 0 — AGENT CODE THẬT (Claude Code headless), thử TRƯỚC hết: chất lượng cao hơn hẳn
+    # đường API bên dưới (test thật: pass sạch ngay lần đầu, 47/47 WCAG AA). Claude Code tự viết
+    # NGUYÊN file index.html (không qua build_ai_scene_html/khung chrome cố định — nó tự thiết kế
+    # cả phần thương hiệu theo đúng skill), nên khi tầng này thành công thì BỎ QUA toàn bộ vòng
+    # tự-sửa API bên dưới. Rớt về tầng API nếu claude CLI không có/lỗi/timeout.
+    if generate_scene_via_claude_code(cau, duration, project_dir):
+        used_ai_scene = True
+
+    # Vòng tự-sửa 2 tầng qua API (chỉ chạy nếu tầng 0 ở trên thất bại/không có claude CLI):
     # Tầng 1 — lint --json (~1.3s, không mở trình duyệt): vá nhanh lỗi cấu trúc/GSAP tĩnh.
     # Tầng 2 — check --json (~6.7s, có trình duyệt) SAU KHI lint sạch: bắt lỗi runtime/layout/
     # contrast mà lint tĩnh không thấy được (đa số lỗi thật nằm ở đây, không phải lint — quan sát
     # thật khi test) — feed đúng finding thật (code/message/fixHint) cho AI vá, KHÔNG bỏ thiết kế
     # đi sinh lại mù như bản cũ. Chỉ sinh lại từ đầu khi vá hết số lần cho phép vẫn còn lỗi.
-    index_path = os.path.join(project_dir, "index.html")
-    used_ai_scene = False
-    for gen_round in range(2):
+    for gen_round in range(2 if not used_ai_scene else 0):
         ai_content = generate_ai_scene(cau, duration)
         if ai_content is None:
             continue
@@ -561,13 +632,15 @@ def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
     return segment_path
 
 
-def render(kich_ban: dict, out_mp4: str, max_workers: int = 6) -> None:
-    """Chạy SONG SONG nhiều câu cùng lúc (mặc định 6 luồng) thay vì tuần tự từng câu — mỗi câu
-    độc lập hoàn toàn (TTS + AI thiết kế + render riêng), chỉ cần ghép nối đúng THỨ TỰ ở bước
-    cuối. Tốc độ tổng thể tăng gần đúng theo số luồng (máy 12 core, nhưng RAM THẬT khả dụng lúc đo
-    chỉ ~6.7GB do máy đang chạy nhiều app khác — mỗi luồng ăn ~300-400MB cho 1 Chrome headless
-    riêng, 6 luồng ~2-2.4GB vẫn an toàn). Tăng max_workers nếu máy rảnh hơn/nhiều RAM hơn, giảm
-    nếu thấy hết RAM/CPU quá tải (kiểm bằng `free -h` trước khi tăng)."""
+def render(kich_ban: dict, out_mp4: str, max_workers: int = 3) -> None:
+    """Chạy SONG SONG nhiều câu cùng lúc thay vì tuần tự từng câu — mỗi câu độc lập hoàn toàn
+    (TTS + thiết kế cảnh + render riêng), chỉ cần ghép nối đúng THỨ TỰ ở bước cuối.
+
+    Mặc định GIẢM xuống 3 luồng (trước là 6) kể từ khi thêm tầng 0 — Claude Code headless
+    (generate_scene_via_claude_code): mỗi lượt gọi nặng hơn nhiều so với 1 API call thường (agent
+    tự lặp nhiều bước, có thể mất 1-4 phút/cảnh), và dùng CHUNG 1 tài khoản Pro cá nhân qua CLI
+    `claude` — chạy quá nhiều luồng cùng lúc dễ chạm giới hạn dùng của gói cá nhân. Tăng lại nếu
+    đã có Anthropic API key riêng cho việc này, giảm nếu thấy bị rate-limit/timeout nhiều."""
     cau_list = kich_ban.get("cau", [])
     n_workers = min(max_workers, len(cau_list)) or 1
     with tempfile.TemporaryDirectory() as tmp:
