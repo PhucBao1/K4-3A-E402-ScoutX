@@ -344,22 +344,33 @@ Ngữ cảnh câu này (đọc để chọn đúng sơ đồ, KHÔNG cần vẽ 
 Ý đồ hình ảnh (mô tả cơ chế cần vẽ — đọc kỹ, đây là thứ quan trọng nhất để chọn đúng sơ đồ): {y_do_hinh}
 Thời lượng cảnh: {duration} giây.
 
-PHONG CÁCH HÌNH ẢNH: dựng theo đúng cảm giác kênh 3Blue1Brown (Grant Sanderson)/thư viện Manim — nền GẦN
-ĐEN sang trọng, hình học tối giản (đường nét mảnh, ít chi tiết thừa), không dùng gradient sặc sỡ hay bóng đổ
-nặng, mọi thứ trông như đang được "vẽ tay" trên bảng đen kỹ thuật số chứ không phải slide phẳng.
+PHONG CÁCH HÌNH ẢNH: "VinUni Academic Light Theme" — nền SÁNG hàn lâm, chuyên nghiệp, tối giản, đường nét
+kỹ thuật rõ ràng (không phải slide phẳng nhàm chán, cũng không phải nền tối kiểu cyberpunk). Hình học sạch,
+ít chi tiết thừa, không dùng gradient sặc sỡ hay bóng đổ nặng (chỉ box-shadow rất nhẹ nếu cần tách lớp thẻ).
 
-BẢNG MÀU BẮT BUỘC (không dùng màu khác): nền GẦN ĐEN #0A0A0F · chữ chính trắng ngà #F5F5F5 · accent xanh
-"Manim" #58C4DD (dùng cho đường/hình khối/nhãn phụ — màu chủ đạo của mọi sơ đồ) · accent vàng #FFC857 CHỈ
-dùng để nhấn 1-2 TỪ KHOÁ quan trọng nhất trong câu (không tô cả câu, không lạm dụng) · chữ phụ xám nhạt
-#B7B7C2. Nếu cần 1 khối/thẻ có nền riêng khác nền chính (vd 1 ô/card), dùng #16161F (đen hơi sáng hơn nền
-chính một chút, không dùng màu navy/xanh). Font: 'Space Grotesk' cho tiêu đề/số liệu, 'IBM Plex Sans' cho
-nội dung (cả 2 đã load sẵn, chỉ cần dùng font-family, không cần thêm link).
-QUY TẮC TƯƠNG PHẢN (WCAG AA, bắt buộc, hay sai nhất — đã từng bị huỷ vì lỗi này): #58C4DD và #FFC857 CHỈ
-được dùng làm màu CHỮ, đường SVG (stroke), hoặc viền — TRÊN NỀN TỐI (#0A0A0F hoặc #16161F) tương phản đạt
-~9.7:1 và ~12.8:1, đạt chuẩn. TUYỆT ĐỐI KHÔNG dùng #58C4DD hoặc #FFC857 làm background-color của 1 khối
-rồi đặt chữ trắng/#F5F5F5 lên trên (tương phản chỉ ~1.4-1.9:1, KHÔNG đạt 4.5:1 bắt buộc, sẽ bị huỷ ngay).
-Nếu bắt buộc phải tô nền đặc bằng 1 trong 2 màu đó (vd 1 nhãn/badge nhỏ nổi bật), chữ bên trong PHẢI là màu
-tối #0A0A0F (tương phản ~9.7:1 hoặc ~12.8:1, đạt chuẩn) — KHÔNG dùng chữ sáng trên nền màu.
+TUYỆT ĐỐI CẤM EMOJI: KHÔNG dùng bất kỳ ký tự emoji hệ điều hành nào (🌐📊🧠🎨⚡💡💬💻🚀✉️🖼️📄 v.v.) — nhìn
+"AI tạo sẵn, rẻ tiền, thiếu chuyên nghiệp". Thay emoji bằng 1 trong 3 cách: (a) sơ đồ/hình học kỹ thuật vẽ
+bằng SVG (vòng tròn đồng tâm, đồ thị nút-cạnh, mũi tên quy trình...), (b) số đếm tối giản `01 02 03` hoặc
+nhãn viết tắt `[ AI ]`/`[ ML ]`, (c) icon SVG monoline đơn sắc (nét 1.5-2px, cùng tông màu bảng màu dưới
+đây) — KHÔNG BAO GIỜ dùng ký tự Unicode emoji màu.
+
+BẢNG MÀU BẮT BUỘC (không dùng màu khác, đã đo tương phản thật — theo đúng số dưới đây):
+- Nền chính #FFFFFF (trắng tinh) hoặc #F8FAFC (trắng ngà, nếu cần tách nhẹ khỏi nền trắng thuần).
+- Chữ tiêu đề/quan trọng nhất: navy đậm #0C2340 — tương phản ~15.8:1 trên nền trắng, ~14.5:1 trên thẻ
+  ice-blue, AN TOÀN NHẤT, dùng làm màu chữ mặc định cho mọi nhãn/số liệu chính.
+- Chữ phụ/chú thích: xám than #475569 — tương phản ~7:1 trên thẻ ice-blue, đạt chuẩn.
+- Accent xanh dương #2563EB (đường nối, viền thẻ, icon nền tròn) — tương phản CHỮ trên nền trắng chỉ
+  ~5.17:1 (vừa đủ đạt AA 4.5:1, KHÔNG được dùng màu xanh nhạt hơn số hex này).
+- Accent đỏ VinUni #C5221F (kicker/nhãn phân cảnh/đường dẫn output) — tương phản ~5.8:1 trên nền trắng.
+- Thẻ/card nền: ice-blue #F0F6FC với viền #2563EB dày 1.5-2px.
+- Vàng hổ phách #D97706 và xanh ngọc #059669 (mốc thời gian/kết quả nổi bật) — CHÚ Ý: tương phản trên nền
+  trắng chỉ ~3.2:1 và ~3.8:1, KHÔNG đạt 4.5:1 cho chữ thường — CHỈ dùng cho chữ LỚN (≥28px đậm) hoặc cho
+  đường/viền/icon (không phải chữ nhỏ), KHÔNG dùng làm màu chữ nhỏ/chú thích.
+Font: 'Space Grotesk' cho tiêu đề/số liệu, 'IBM Plex Sans' cho nội dung (cả 2 đã load sẵn, chỉ cần dùng
+font-family, không cần thêm link).
+QUY TẮC TƯƠNG PHẢN (WCAG AA, bắt buộc): mọi chữ PHẢI đạt tối thiểu 4.5:1 (chữ ≥24px đậm thì 3:1). Dùng
+đúng các cặp màu/nền đã liệt kê ở trên, KHÔNG tự phối cặp màu khác ngoài danh sách này — đặc biệt KHÔNG đặt
+chữ #D97706/#059669 cỡ thường lên nền trắng.
 
 HOẠT ẢNH "VẼ DẦN" (QUAN TRỌNG — đây là đặc trưng nhận diện phong cách này, ưu tiên hơn fade/scale đơn
 giản): với MỌI đường kẻ/mũi tên/khung/biểu đồ đường, ƯU TIÊN vẽ bằng SVG <path> hoặc <line>/<polyline> có
@@ -386,11 +397,12 @@ RÀNG BUỘC KỸ THUẬT (vi phạm sẽ bị huỷ, dùng bản mẫu an toàn
   ..., n"), để không bao giờ tràn ra ngoài vùng vẽ dù số lượng thực tế bao nhiêu. Nếu ≤4 phần tử, chia đều
   chiều rộng bằng % hoặc calc(), không dùng width cố định theo px cho từng ô.
 - MỌI Ô/NHÃN/KHỐI (trừ riêng đường nối/mũi tên) PHẢI có "trọng lượng thị giác" — nền thẻ đặc
-  `background: #16161F` HOẶC viền dày `border: 2px solid #58C4DD`, bo góc `border-radius: 8-12px`,
-  padding tối thiểu 16-20px. TUYỆT ĐỐI KHÔNG đặt chữ trần nổi trực tiếp trên nền đen không có gì bao quanh —
-  nhìn trống trải, thiếu chuyên nghiệp. Mỗi thẻ/ô tối thiểu rộng 160px, cao 56px (trừ nhãn nhỏ đi kèm sát 1
-  đường/mũi tên). Ưu tiên bố cục dạng thẻ/card như 1 dashboard thật (giống ví dụ: khối "Encoder Block" có
-  nền tối, viền, danh sách nhãn con bên trong mỗi nhãn cũng có nền riêng) hơn là vẽ đường/hình học trần.
+  `background: #F0F6FC` (ice-blue) HOẶC viền dày `border: 2px solid #2563EB`, bo góc `border-radius: 8-12px`,
+  padding tối thiểu 16-20px. TUYỆT ĐỐI KHÔNG đặt chữ trần nổi trực tiếp trên nền trắng không có gì bao
+  quanh — nhìn trống trải, thiếu chuyên nghiệp. Mỗi thẻ/ô tối thiểu rộng 160px, cao 56px (trừ nhãn nhỏ đi
+  kèm sát 1 đường/mũi tên). Ưu tiên bố cục dạng thẻ/card như 1 dashboard thật (giống ví dụ: khối "Encoder
+  Block" có nền ice-blue, viền xanh, danh sách nhãn con bên trong mỗi nhãn cũng có nền riêng) hơn là vẽ
+  đường/hình học trần.
 - KHÔNG BAO GIỜ đặt text (nhãn/label) đè lên đúng vị trí 1 đường kẻ/viền (line/border) — nếu có đường kẻ đi
   ngang qua khu vực có chữ, dịch chữ lệch hẳn lên trên hoặc xuống dưới đường kẻ đó tối thiểu bằng chiều cao
   dòng chữ, không để đường kẻ cắt ngang giữa dòng chữ.
@@ -413,7 +425,7 @@ RÀNG BUỘC KỸ THUẬT (vi phạm sẽ bị huỷ, dùng bản mẫu an toàn
   tl.to(...) 1 chiều — gsap sẽ ghi đè toàn bộ transform và phá mất trạng thái ban đầu đặt trong CSS.
 
 Trả về ĐÚNG JSON, không thêm chữ nào khác:
-{{"html": "<...các thẻ bên trong vùng vẽ, escape đúng JSON, ưu tiên có <svg><path stroke=\\"#58C4DD\\"
+{{"html": "<...các thẻ bên trong vùng vẽ, escape đúng JSON, ưu tiên có <svg><path stroke=\\"#2563EB\\"
   stroke-dasharray=\\"1000\\" stroke-dashoffset=\\"1000\\" fill=\\"none\\" .../></svg> cho phần đường vẽ...>",
   "gsap": ["tl.fromTo(\\"#pathId\\", {{strokeDashoffset:1000}}, {{strokeDashoffset:0,duration:1.2,ease:\\"power2.inOut\\"}}, 0)", "tl.fromTo(\\"#id\\", {{opacity:0}}, {{opacity:1,duration:0.5}}, 0)", "..."]}}
 "gsap" là mảng các dòng lệnh GSAP (timeline đã có sẵn tên "tl", KHÔNG khai báo lại), mỗi dòng 1 lệnh

@@ -46,49 +46,53 @@ SILENCE_DEFAULT_SEC = 2.0
 
 # Khung thương hiệu CỐ ĐỊNH (do code kiểm soát, không để AI tự bịa mỗi cảnh) — dùng chung cho cả
 # bản mẫu an toàn lẫn cảnh do AI thiết kế, để mọi cảnh trong video nhìn LIỀN MẠCH thay vì rời rạc.
-# Học từ guide chính thức của HyperFrames (hyperframes.heygen.com/guides/prompting +
-# github.com/heygen-com/hyperframes/blob/main/docs/guides/claude-design-hyperframes.md): dùng
-# design tokens :root dùng chung, giữ khung thương hiệu (eyebrow/accent-bar/caption card) cố định
-# qua mọi cảnh, để phần AI tự thiết kế chỉ còn đúng 1 việc — sơ đồ minh hoạ — thu hẹp bề mặt lỗi.
+# Bảng màu/phong cách: "VinUni Academic Light Theme" (theo skill scriptscout-authoring của
+# teammate DungBallad, github.com/DungBallad/ScoutX-Skills — đội trưởng xác nhận dùng nền sáng
+# thay 3Blue1Brown dark trước đây), giữ nguyên brand chữ "ScriptScout" của mình (không đổi thành
+# tên khoá của skill gốc), chỉ áp dụng bảng màu + quy tắc "không dùng emoji hệ điều hành".
 _CHROME_STYLE = """
       :root {
-        --bg:#0A0A0F; --ink:#F5F5F5; --accent:#58C4DD; --accent2:#FFC857; --muted:#B7B7C2; --card:#16161F;
+        --bg:#FFFFFF; --bg-canvas:#F8FAFC; --ink:#1E293B; --muted:#475569;
+        --heading:#0C2340; --accent:#2563EB; --accent-red:#C5221F; --card:#F0F6FC;
+        --gold:#D97706; --emerald:#059669;
       }
       #chrome-eyebrow {
         position: absolute; left: 96px; top: 88px;
-        color: var(--accent); font-family: 'Space Grotesk', Arial, sans-serif;
-        font-size: 26px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+        color: var(--accent-red); font-family: 'Space Grotesk', Arial, sans-serif;
+        font-size: 26px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase;
         opacity: 0;
       }
       #chrome-accent-bar {
         position: absolute; left: 96px; top: 132px; width: 110px; height: 6px;
-        background: var(--accent); border-radius: 4px; transform-origin: left;
+        background: var(--accent-red); border-radius: 4px; transform-origin: left;
       }
       #chrome-headline {
         position: absolute; left: 96px; top: 164px; width: 1400px;
-        color: var(--ink); font-family: 'Space Grotesk', Arial, sans-serif;
-        font-size: 56px; font-weight: 900; line-height: 1.2;
+        color: var(--heading); font-family: 'Space Grotesk', Arial, sans-serif;
+        font-size: 56px; font-weight: 800; line-height: 1.2;
         opacity: 0;
       }
       #chrome-source-tag {
         position: absolute; right: 96px; top: 88px;
         color: var(--muted); font-size: 20px;
-        background: var(--card); padding: 8px 18px; border-radius: 100px;
+        background: var(--card); border: 1px solid rgba(37,99,235,0.3);
+        padding: 8px 18px; border-radius: 100px;
         opacity: 0;
       }
       #chrome-caption-bar {
         position: absolute; left: 96px; right: 96px; bottom: 48px; max-height: 96px;
-        background: var(--card); border-radius: 16px; overflow: hidden;
+        background: rgba(255,255,255,0.95); border: 1px solid rgba(148,163,184,0.4);
+        border-radius: 16px; overflow: hidden; box-shadow: 0 15px 35px rgba(15,23,42,0.12);
         display: flex; align-items: center; gap: 16px; padding: 12px 28px;
         opacity: 0;
       }
       #chrome-caption-icon {
         flex: none; width: 36px; height: 36px; border-radius: 50%;
-        background: var(--accent); color: var(--bg);
+        background: var(--accent); color: #FFFFFF;
         display: flex; align-items: center; justify-content: center; font-size: 18px;
       }
       #chrome-caption-text {
-        color: var(--ink); font-size: 22px; line-height: 1.35;
+        color: var(--heading); font-size: 22px; font-weight: 600; line-height: 1.35;
         display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
       }
       #ai-content {
@@ -114,7 +118,7 @@ def _chrome_html(headline: str, caption: str, eyebrow: str, source_tag: str, dur
         f'{source_tag_html}\n'
         f'<div id="chrome-caption-bar" class="clip" data-start="0" data-duration="{duration}">\n'
         f'  <div id="chrome-caption-icon">'
-        f'<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#0A0A0F" '
+        f'<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#FFFFFF" '
         f'd="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-.77-3.29-2-4.24v8.48c1.23-.95 2-2.47 2-4.24z"/>'
         f'</svg></div>\n'
         f'  <div id="chrome-caption-text">{html.escape(caption)}</div>\n'
@@ -146,7 +150,7 @@ SCENE_TEMPLATE = """<!doctype html>
       * {{ margin: 0; padding: 0; box-sizing: border-box; }}
       html, body {{
         width: 1920px; height: 1080px; overflow: hidden;
-        background: #0A0A0F;
+        background: #FFFFFF;
         font-family: 'IBM Plex Sans', Arial, sans-serif;
       }}
       #root {{ width: 100%; height: 100%; position: relative; }}
@@ -229,7 +233,7 @@ AI_SCENE_WRAPPER = """<!doctype html>
       * {{ margin: 0; padding: 0; box-sizing: border-box; }}
       html, body {{
         width: 1920px; height: 1080px; overflow: hidden;
-        background: #0A0A0F;
+        background: #FFFFFF;
         font-family: 'IBM Plex Sans', Arial, sans-serif;
       }}
       #root {{ width: 100%; height: 100%; position: relative; overflow: hidden; }}
