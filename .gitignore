@@ -4,3 +4,8 @@ __pycache__/
 node_modules/
 .venv/
 *.mp4
+
+# Internal preparation notes - not submission artifacts
+pitch*.md
+project-deep-dive.md
+demo-slides-outline.md

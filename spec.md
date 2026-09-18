@@ -53,6 +53,107 @@ Loại: [ ] Tối ưu tính năng có sẵn  [x] Tính năng mới
   *(Sửa lại 17/9 trưa — bản trước bắt buộc upload slide, LỆCH khỏi đúng "Bài toán gốc" của đề C3
   ("không đưa sẵn tài liệu nào, agent tự tìm 100% trên mạng"). Đã sửa: slide giờ tuỳ chọn, chủ đề là input
   bắt buộc chính — xem Changelog.)*
+
+### §4a. Workflow end-to-end
+
+```text
++-------------------------------+
+| Người viết nhập               |
+| topic + goal + audience       |
+| + duration + slide (tuỳ chọn) |
++---------------+---------------+
+                |
+                v
++-------------------------------+
+| Guardrail kiểm tra phạm vi    |
++---------------+---------------+
+                |
+        +-------+--------+
+        |                |
+  ngoài phạm vi        hợp lệ
+        |                |
+        v                v
++---------------+  +-------------------------------+
+| Chặn sớm và   |  | Đọc PDF nếu có + tìm 2-3     |
+| giải thích    |  | nguồn web                     |
++---------------+  +---------------+---------------+
+                                    |
+                                    v
+                    +-------------------------------+
+                    | AI tạo hoSo + kichBan         |
+                    +---------------+---------------+
+                                    |
+                                    v
+                    +-------------------------------+
+                    | Validator bằng code           |
+                    | schema, ID, số liệu, số nguồn |
+                    +---------------+---------------+
+                                    |
+                            +-------+-------+
+                            |               |
+                       không đạt           đạt
+                            |               |
+                            v               v
+                    +---------------+  +-----------------------+
+                    | Retry có      |  | AI Judge kiểm tra     |
+                    | giới hạn      |  | citation relevance    |
+                    +-------+-------+  +-----------+-----------+
+                            |                      |
+                            +----------+-----------+
+                                       | đạt
+                                       v
+                    +-------------------------------+
+                    | UI: script + evidence/câu     |
+                    +---------------+---------------+
+                                    |
+                                    v
+                    +-------------------------------+
+                    | Người viết duyệt/thêm/loại    |
+                    | nguồn và quyết định cuối      |
+                    +-------------------------------+
+```
+
+**Quan hệ dữ liệu dùng để truy xuất nguồn:** `kichBan.cau[].nguon[]` chứa ID của
+`hoSo.thongTin[]`; mỗi `thongTin` chứa một hoặc nhiều `bangChung`; mỗi `bangChung.nguonId`
+trỏ tới đúng một phần tử trong `hoSo.nguon[]`. Vì vậy UI có thể đi từ một câu tới đúng claim,
+đoạn trích và tài liệu gốc thay vì chỉ hiện danh sách URL ở cuối.
+
+```text
+[Reviewer bấm Loại nguồn]
+              |
+              v
+[Đánh dấu nguồn "bi-loai", giữ audit trail]
+              |
+              v
+[Tìm thongTin có bangChung dùng nguồn đó]
+              |
+              v
+[Tìm đúng các câu phụ thuộc]
+              |
+       +------+------+
+       |             |
+   không có         có
+       |             |
+       v             v
+[Giữ nguyên]   [Chỉ rewrite affected_cau]
+                     |
+                     v
+               [Gộp với câu cũ không đổi]
+                     |
+                     v
+               [Validate + citation judge]
+                     |
+              +------+------+
+              |             |
+           không đạt       đạt
+              |             |
+              v             v
+       [Retry/báo lỗi] [Trả rewrittenNs]
+```
+
+Hai sơ đồ trên mô tả **luồng chính được chấm**. Các endpoint QA hậu kỳ và dựng video là nhánh
+bonus, không nằm trong lát cắt end-to-end của C3.
+
 - Non-goals (≥3 thứ KHÔNG build, khác đề C3 gốc — ghi rõ để không bị hiểu nhầm sai đề):
   1. **Không tự dựng video hoàn chỉnh trong luồng chính** — sản phẩm chính chỉ ra kịch bản (text) + hồ sơ
      nguồn, đúng phạm vi C3 cho phép. *(Có làm thêm bonus "NÂNG CAO" — `codebase/backend/render_video.py`
