@@ -16,6 +16,8 @@ cài lại đúng 3 bước trên vào đúng đường dẫn mặc định bên
 
 Dùng: python3 render_video_hyperframes.py <đường_dẫn_kịch_bản.json> <đường_dẫn_output.mp4>
 """
+import base64
+import glob
 import html
 import json
 import os
@@ -27,7 +29,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from render_video import audio_duration_sec, make_silence, tts_to_file
 from render_video import client as openai_client
-from prompt import HYPERFRAMES_FIX_PROMPT, HYPERFRAMES_SCENE_PROMPT
+from prompt import HYPERFRAMES_FIX_PROMPT, HYPERFRAMES_QUALITY_JUDGE_PROMPT, HYPERFRAMES_SCENE_PROMPT
 
 _HOME = os.path.expanduser("~")
 _DEFAULT_NODE_BIN = os.path.join(_HOME, ".local/hyperframes-tools/node/bin")
@@ -340,6 +342,48 @@ def check_scene(project_dir: str) -> dict:
     return {"ok": data.get("ok", False), "findings": findings}
 
 
+def snapshot_scene(project_dir: str, at_seconds: float) -> str | None:
+    """Chụp 1 khung hình thật của cảnh tại thời điểm at_seconds bằng `hyperframes snapshot` — dùng
+    để đưa cho AI-chấm-chất-lượng NHÌN THẬT, không phải đoán qua HTML/CSS. Trả None nếu chụp lỗi."""
+    snap_dir = os.path.join(project_dir, "snapshots")
+    for old in glob.glob(os.path.join(snap_dir, "*.png")):
+        os.remove(old)
+    subprocess.run(
+        [_bin_path("hyperframes"), "snapshot", project_dir, "--at", str(at_seconds), "--no-end"],
+        capture_output=True, env=_run_env(),
+    )
+    pngs = sorted(glob.glob(os.path.join(snap_dir, "*.png")))
+    return pngs[-1] if pngs else None
+
+
+def judge_scene_quality(cau: dict, image_path: str) -> dict:
+    """Dual-Model Separation (học từ skill video-qa của teammate DungBallad,
+    github.com/DungBallad/ScoutX-Skills): model CHẤM phải KHÁC model TẠO (gpt-4o thay vì
+    gpt-5.4-mini đang thiết kế cảnh) để tránh thiên kiến tự khen bài chính mình. Bắt lỗi mà
+    `hyperframes check` không thấy được vì hợp lệ về kỹ thuật nhưng sai về nội dung/thẩm mỹ: ô
+    trống không chữ, chồng lấn nhìn rối, sơ đồ lạc đề. Lỗi/không đọc được ảnh thì coi như đạt
+    (fail-open, không chặn nhầm luồng chính)."""
+    try:
+        with open(image_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode()
+        resp = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": [
+                {"type": "text", "text": HYPERFRAMES_QUALITY_JUDGE_PROMPT.format(
+                    chu_tren_man_hinh=cau.get("chuTrenManHinh") or cau.get("loi", "")[:40],
+                    loi=cau.get("loi", ""), y_do_hinh=cau.get("yDoHinh", ""),
+                )},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}", "detail": "high"}},
+            ]}],
+            response_format={"type": "json_object"},
+        )
+        result = json.loads(resp.choices[0].message.content)
+        return {"dat": bool(result.get("dat", True)), "vanDe": result.get("vanDe", [])}
+    except Exception as e:
+        print(f"[HyperFrames AI] Chấm chất lượng sáng tạo lỗi, coi như đạt: {e}")
+        return {"dat": True, "vanDe": []}
+
+
 def lint_scene(project_dir: str) -> dict:
     """Chạy `hyperframes lint --json` — CHỈ ~1.3s (không mở trình duyệt) so với ~6.7s của
     `check` đầy đủ, dùng làm vòng lặp tự-sửa NHANH trước khi tốn browser cho check cuối cùng.
@@ -464,10 +508,39 @@ def _process_one_scene(i: int, cau: dict, tmp: str, project_dir: str) -> str:
                 f.write(build_ai_scene_html(cau, ai_content, duration))
             check_result = check_scene(project_dir)
 
-        if check_result.get("ok"):
+        if not check_result.get("ok"):
+            print(f"[HyperFrames] Cảnh {n}: vòng sinh {gen_round + 1} vá hết lượt vẫn còn lỗi check, thử sinh lại...")
+            continue
+
+        # Tầng 3 — chấm CHẤT LƯỢNG SÁNG TẠO bằng ảnh chụp thật (model khác, gpt-4o) — bắt lỗi mà
+        # check kỹ thuật không thấy: ô trống không chữ, chồng lấn nhìn rối, sơ đồ lạc đề. Phát hiện
+        # thật (test 5 câu trước khi thêm tầng này): câu 5 pass check sạch ngay lần đầu nhưng có
+        # 2 ô trống không chữ — check không có cách nào bắt được loại lỗi này.
+        snap_path = snapshot_scene(project_dir, duration / 2)
+        judge_result = judge_scene_quality(cau, snap_path) if snap_path else {"dat": True, "vanDe": []}
+        for judge_attempt in range(2):
+            if judge_result.get("dat"):
+                break
+            van_de = judge_result.get("vanDe", [])
+            print(f"[HyperFrames] Cảnh {n}: AI chấm sáng tạo thấy {len(van_de)} vấn đề, cho AI vá lần {judge_attempt + 1}...")
+            findings = [{"code": "chat_luong_sang_tao", "message": vd, "selector": "", "fixHint": ""} for vd in van_de]
+            fixed = fix_ai_scene(cau, duration, ai_content, findings)
+            if fixed is None:
+                break
+            ai_content = fixed
+            with open(index_path, "w", encoding="utf-8") as f:
+                f.write(build_ai_scene_html(cau, ai_content, duration))
+            # Vá xong phải re-check kỹ thuật — sửa nội dung có thể vô tình phá layout đã sạch.
+            check_result = check_scene(project_dir)
+            if not check_result.get("ok"):
+                break
+            snap_path = snapshot_scene(project_dir, duration / 2)
+            judge_result = judge_scene_quality(cau, snap_path) if snap_path else {"dat": True, "vanDe": []}
+
+        if check_result.get("ok") and judge_result.get("dat"):
             used_ai_scene = True
             break
-        print(f"[HyperFrames] Cảnh {n}: vòng sinh {gen_round + 1} vá hết lượt vẫn còn lỗi check, thử sinh lại...")
+        print(f"[HyperFrames] Cảnh {n}: vòng sinh {gen_round + 1} vẫn chưa đạt chất lượng, thử sinh lại...")
     if not used_ai_scene:
         print(f"[HyperFrames] Cảnh {n}: hết các vòng thử, dùng bản mẫu an toàn.")
         with open(index_path, "w", encoding="utf-8") as f:

@@ -471,3 +471,36 @@ Trả về ĐÚNG JSON, không thêm chữ nào khác, đúng định dạng nh�
 {{"html": "<...toàn bộ HTML đã sửa lỗi, giữ nguyên phần không liên quan...>",
   "gsap": ["...toàn bộ danh sách lệnh GSAP đã sửa lỗi, giữ nguyên dòng không liên quan..."]}}
 """
+
+
+# Vòng chấm CHẤT LƯỢNG SÁNG TẠO — khác hẳn lint/check (chỉ bắt lỗi KỸ THUẬT: tràn lề, tương phản,
+# JS lỗi). `hyperframes check` không thể phát hiện 1 ô trống không chữ, bố cục rối/chồng lấn nhìn
+# xấu, hay sơ đồ lạc đề — vì về mặt kỹ thuật HTML/CSS đó vẫn hợp lệ. Bước này dùng model KHÁC
+# (gpt-4o, không phải gpt-5.4-mini đang thiết kế cảnh) tự NHÌN ảnh chụp cảnh thật để chấm — đúng
+# nguyên tắc "Dual-Model Separation" (học từ skill video-qa của teammate DungBallad,
+# github.com/DungBallad/ScoutX-Skills): model chấm phải khác model tạo để tránh thiên kiến tự
+# khen bài của chính mình.
+HYPERFRAMES_QUALITY_JUDGE_PROMPT = """Bạn là người kiểm duyệt chất lượng ĐỘC LẬP cho 1 cảnh video bài giảng
+(không phải người đã thiết kế cảnh này) — nhìn ảnh chụp cảnh thật đính kèm và chấm THẬT KHẮT KHE, giống
+như đang duyệt sản phẩm trước khi cho lên sóng, KHÔNG dễ dãi cho qua.
+
+Câu kịch bản của cảnh này:
+- Tiêu đề: "{chu_tren_man_hinh}"
+- Lời đọc: "{loi}"
+- Ý đồ hình ảnh cần đạt được: {y_do_hinh}
+
+Kiểm tra CHÍNH XÁC 4 điều sau trên ảnh:
+1. **Ô trống**: có ô/thẻ/khung nào được vẽ ra (có viền/nền) nhưng KHÔNG có chữ hoặc nội dung gì bên trong
+   không? Đây là lỗi RẤT NGHIÊM TRỌNG (item rỗng vô nghĩa).
+2. **Chồng lấn/đè chữ**: có đường kẻ/hình khác đè lên làm chữ khó đọc, hoặc 2 khối chồng lên nhau lộn xộn
+   không?
+3. **Đúng nội dung**: sơ đồ có thực sự minh hoạ đúng "Ý đồ hình ảnh" nêu trên không, hay chỉ là hình trang
+   trí chung chung không liên quan?
+4. **Bố cục chuyên nghiệp**: nhìn tổng thể có cân đối, gọn gàng, giống dashboard/slide chuyên nghiệp không,
+   hay lộn xộn/rối mắt/thưa thớt bất thường?
+
+Trả về ĐÚNG JSON, không thêm chữ nào khác:
+{{"dat": true/false, "vanDe": ["mô tả cụ thể vấn đề 1 (chỉ rõ vị trí/tên phần tử nếu thấy được)", "..."]}}
+"dat"=false nếu VI PHẠM BẤT KỲ điều nào ở trên (đặc biệt điều 1 và 2 — luôn luôn coi là lỗi nếu thấy). Nếu
+không có vấn đề gì, "vanDe" là mảng rỗng.
+"""
