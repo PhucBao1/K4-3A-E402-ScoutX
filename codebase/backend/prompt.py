@@ -384,6 +384,24 @@ rotate/translate) mượt bằng ease "power2.inOut" hoặc "power1.out" thay v�
 điệu — ví dụ 1 hình vuông morph thành hình tròn (border-radius animate), hoặc 1 mũi tên "bay" dọc theo
 đường đã vẽ xong. Text vẫn có thể dùng opacity/y đơn giản, nhưng SƠ ĐỒ CHÍNH của cảnh bắt buộc phải có ít
 nhất 1 hiệu ứng "vẽ dần" (stroke-dashoffset) hoặc biến hình mượt, không được chỉ fade-in/scale-in tĩnh.
+Hiệu ứng THOÁT CẢNH: không chỉ fade phẳng toàn bộ khối cùng lúc — ƯU TIÊN cho các phần tử cùng bay nhẹ lên
+trên khi biến mất (`tl.to(...,{{opacity:0,y:-20,duration:0.6,ease:"power2.in"}}, <gần cuối cảnh>)`), tạo
+cảm giác chuyển cảnh mượt hơn là biến mất đột ngột.
+
+BỐ CỤC NÂNG CAO (dùng khi nội dung phù hợp, không bắt buộc mọi cảnh):
+- **2 cột song song**: nếu câu vừa có 1 sơ đồ trực quan (hình vẽ/biểu đồ) VỪA có danh sách nhiều mục liệt
+  kê, chia vùng vẽ thành 2 cột — sơ đồ 1 bên (vd ~560-650px), danh sách có cấu trúc bên còn lại — thay vì
+  chỉ vẽ 1 trong 2 hoặc xếp chồng dọc chật chội.
+- **Hàng danh sách có số thứ tự**: mỗi mục trong danh sách dùng 1 "badge" số thứ tự nhỏ (font monospace,
+  nền màu, vd "01") + tiêu đề mục (đậm) + nhãn phụ mô tả ngắn (nhạt hơn) + 1 câu diễn giải — không chỉ 1
+  dòng chữ trần, tạo cảm giác dashboard chuyên nghiệp.
+- **Tô đậm mục quan trọng nhất**: nếu 1 chuỗi/danh sách có 1 mục là "cốt lõi/kết quả cuối cùng" (vd LLM là
+  hạt nhân trong chuỗi AI⊃ML⊃DL⊃GenAI⊃LLM), mục đó dùng border dày hơn + nền đậm màu hơn (hoặc gradient
+  nhẹ) + chữ lớn hơn 1 chút so với các mục còn lại — để mắt người xem tự nhiên dừng ở đó.
+- **Khối "điểm cốt lõi"**: nếu câu có 1 ý tổng kết/kết luận rõ ràng, có thể thêm 1 khối nhỏ cuối sơ đồ dạng
+  pill/banner nền đậm (vd navy `#0C2340`, chữ trắng), mở đầu bằng nhãn ngắn viết hoa trong ngoặc vuông (vd
+  "[ĐIỂM CỐT LÕI]") rồi tới câu tổng kết ngắn gọn — không bắt buộc, chỉ dùng khi câu THỰC SỰ có 1 kết luận
+  đáng nhấn, không lặp lại y nguyên "loi".
 
 RÀNG BUỘC KỸ THUẬT (vi phạm sẽ bị huỷ, dùng bản mẫu an toàn thay thế):
 - Chỉ trả về NỘI DUNG BÊN TRONG vùng vẽ (các thẻ div/p/svg...), KHÔNG trả về <html>/<head>/<body>/<script>,
